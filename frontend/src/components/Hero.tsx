@@ -8,6 +8,7 @@ import { FC, useEffect, useRef, useState } from 'react';
 
 import Button from './Button';
 import VideoPreview from './VideoPreview';
+import QuizPopup from './QuizPopup';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -26,6 +27,9 @@ const Hero: FC = () => {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [loadedVideos, setLoadedVideos] = useState<number>(0);
+
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState('');
 
   const totalVideos = 4;
   const animatingVdRef = useRef<HTMLVideoElement | null>(null);
@@ -125,6 +129,15 @@ const Hero: FC = () => {
   const getVideoSrc = (index: number): string =>
     `videos/hero-${index}.hevc.mp4`;
 
+  const openPopup = () => {
+    const currentTitle = videoTitles[backgroundIndex - 1]
+      .replace(/<b>|<\/b>/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, '');
+    setSelectedTopic(currentTitle);
+    setIsPopupOpen(true);
+  };
+
   return (
     <div className="relative h-dvh w-screen overflow-x-hidden">
       {loading && (
@@ -211,6 +224,7 @@ const Hero: FC = () => {
               title="Test Your Mind"
               leftIcon={<TiLocationArrow />}
               containerClass="bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 hover:opacity-90 text-white flex-center gap-1"
+              onClick={openPopup}
             />
           </div>
         </div>
@@ -221,6 +235,12 @@ const Hero: FC = () => {
         key={`title-2-${backgroundIndex}`}
         className="dynamic-title special-font hero-heading absolute bottom-5 right-5 text-black"
         dangerouslySetInnerHTML={{ __html: videoTitles[backgroundIndex - 1] }}
+      />
+
+      <QuizPopup
+        open={isPopupOpen}
+        onClose={() => setIsPopupOpen(false)}
+        topic={selectedTopic}
       />
     </div>
   );

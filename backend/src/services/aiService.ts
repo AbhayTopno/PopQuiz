@@ -7,44 +7,33 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY!,
 });
 
-// Object to hold the unique part of each prompt
 const promptPersonas: { [key: string]: string } = {
-  easy: `Imagine you are a university professor creating a quiz for an introductory '101' course on the topic: {topic}.
-
-Generate an "easy" quiz with exactly {count} questions to assess a student's understanding of the most fundamental concepts. The questions should test for core definitions, key terminology, and major, widely-known facts.`,
-
-  medium: `Imagine you are a university professor creating a mid-term exam for an undergraduate course on the topic: {topic}.
-
-Generate a "medium" difficulty quiz with exactly {count} questions designed to test if students can apply concepts and connect different ideas. Questions should go beyond simple recall and require an understanding of cause-and-effect, comparisons between key ideas, and the application of knowledge to simple scenarios.`,
-
-  hard: `Imagine you are a university professor setting the final exam for a graduate-level seminar on the topic: {topic}.
-
-Generate a "hard" quiz with exactly {count} questions designed to challenge the most knowledgeable students. The questions must test for a deep, critical understanding of non-obvious facts, nuances, edge cases, and the synthesis of multiple complex concepts. The goal is to differentiate true experts.`,
+  easy: `You are a professional quiz master create a beginner quiz on {topic}. Create exactly {count} "easy" questions testing basic understanding.`,
+  medium: `You are a professional quiz master create a mid-term quiz on {topic}. Create exactly {count} "medium" questions testing applied knowledge.`,
+  hard: `You are a professional quiz master create a final exam quiz on {topic}. Create exactly {count} "hard" questions testing deep critical understanding.`,
 };
 
-// Common instructions that apply to all prompts
 const jsonResponseInstruction = `
-Your response must be only the raw JSON object, adhering strictly to this structure:
+Respond ONLY with valid JSON in this exact format:
 {
   "questions": [
     {
-      "question": "...",
-      "options": ["A", "B", "C", "D"],
-      "answer": "A"
+      "question": "Question text",
+      "options": ["A: Answer A", "B: Answer B", "C: Answer C", "D: Answer D"],
+      "answer": "Option B: Answer B"
     }
   ]
-}`;
+}
+No explanations, no extra text. Only the JSON object.`;
 
 export async function generateQuiz(
   topic: string,
   difficulty: string = 'medium',
   count: number = 5
 ) {
-  // Select the persona, defaulting to medium if the key doesn't exist
   const persona =
     promptPersonas[difficulty.toLowerCase()] || promptPersonas.medium;
 
-  // Build the final prompt
   const prompt =
     persona.replace('{topic}', topic).replace('{count}', count.toString()) +
     jsonResponseInstruction;
@@ -53,7 +42,7 @@ export async function generateQuiz(
     const chatCompletion = await groq.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      model: 'llama-3.1-8b-instant', // A current, fast model on Groq
+      model: 'llama-3.1-8b-instant',
     });
 
     const content = chatCompletion.choices[0]?.message?.content;
@@ -62,11 +51,19 @@ export async function generateQuiz(
       throw new Error('No content returned from Groq');
     }
 
-    console.log('Groq raw response:', content);
+    const parsedContent = JSON.parse(content);
 
-    return JSON.parse(content);
+    // Validate the structure of the AI's response before returning it
+    if (!parsedContent.questions || !Array.isArray(parsedContent.questions)) {
+      throw new Error(
+        'Invalid JSON structure from AI: "questions" array is missing or not an array.'
+      );
+    }
+
+    console.log('Groq response validated successfully.');
+    return parsedContent;
   } catch (err) {
-    console.error('Groq Error:', err);
-    return { error: 'Failed to generate quiz' };
+    console.error('Groq Service Error:', err);
+    throw new Error('Failed to generate quiz from AI service.');
   }
 }

@@ -9,10 +9,12 @@ const Button: React.FC<ButtonProps> = ({
   rightIcon,
   leftIcon,
   containerClass,
+  onClick, // 1. Added onClick to the destructured props
 }) => {
   return (
     <button
       id={id}
+      onClick={onClick} // 2. Passed the onClick handler to the button element
       className={clsx(
         'group relative z-10 flex w-fit cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-full bg-violet-50 px-7 py-3 text-black',
         containerClass

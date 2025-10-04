@@ -1,16 +1,21 @@
 import express from 'express';
-import { generateQuiz } from '../services/aiService.js';
+import {
+  generateAndSaveQuiz,
+  createQuiz,
+  deleteQuiz,
+  getQuizById,
+  updateQuiz,
+} from '../controllers/quiz.controller.ts';
 
 const router = express.Router();
 
-router.post('/generate', async (req, res) => {
-  const { topic, difficulty, count } = req.body;
-  try {
-    const quiz = await generateQuiz(topic, difficulty, count);
-    res.json(quiz);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to generate quiz' });
-  }
-});
+// Route to generate a quiz using AI and save it to the database
+router.post('/generate', generateAndSaveQuiz);
+
+// Route for manual quiz creation
+router.route('/').post(createQuiz);
+
+// Routes for fetching, updating, and deleting a specific quiz by its ID
+router.route('/:id').get(getQuizById).put(updateQuiz).delete(deleteQuiz);
 
 export default router;

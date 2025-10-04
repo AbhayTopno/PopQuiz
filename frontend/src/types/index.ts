@@ -5,6 +5,7 @@ export type ButtonProps = {
   rightIcon?: React.ReactNode;
   leftIcon?: React.ReactNode;
   containerClass?: string;
+  onClick?: () => void;
 };
 
 export interface AnimatedTitleProps {
@@ -20,6 +21,7 @@ export interface ImageClipBoxProps {
 export interface BentoTiltProps {
   children: React.ReactNode;
   className?: string;
+  onClick?: () => void;
 }
 
 export interface BentoCardProps {
@@ -27,6 +29,8 @@ export interface BentoCardProps {
   title: React.ReactNode;
   description?: string;
   isComingSoon?: boolean;
+  onOpen?: () => void;
+  topic?: string;
 }
 
 export interface SocialLink {
