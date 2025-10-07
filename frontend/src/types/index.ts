@@ -37,3 +37,23 @@ export interface SocialLink {
   href: string;
   icon: React.ReactElement;
 }
+
+export interface Question {
+  questionText: string;
+  options: string[];
+  correctAnswer: string;
+}
+
+export interface QuizData {
+  _id: string;
+  topic: string;
+  difficulty: string;
+  numberOfQuestions: number;
+  questions: Question[];
+  hostedBy: string;
+}
+
+export type Props = {
+  initialQuizData: QuizData;
+  initialDuration?: number;
+};

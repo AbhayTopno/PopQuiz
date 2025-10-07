@@ -8,6 +8,7 @@ import { useWindowScroll } from 'react-use';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthPopup from './AuthPopup';
 import ProfilePopup from './ProfilePopup';
+import Image from 'next/image';
 
 const navItems: string[] = ['Daily', 'Custom', 'Prologue', 'About', 'Contact'];
 
@@ -130,10 +131,11 @@ const NavBar: React.FC = () => {
               >
                 {isAuthenticated && user ? (
                   user.avatar ? (
-                    <img
+                    <Image
                       src={user.avatar || '/placeholder.svg'}
                       alt={user.username}
                       className="h-full w-full object-cover"
+                      layout="fill"
                     />
                   ) : (
                     <span className="font-zentry text-lg font-black text-white">

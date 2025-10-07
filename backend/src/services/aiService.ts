@@ -9,8 +9,8 @@ const groq = new Groq({
 
 const promptPersonas: { [key: string]: string } = {
   easy: `You are a professional quiz master create a beginner quiz on {topic}. Create exactly {count} "easy" questions testing basic understanding.`,
-  medium: `You are a professional quiz master create a mid-term quiz on {topic}. Create exactly {count} "medium" questions testing applied knowledge.`,
-  hard: `You are a professional quiz master create a final exam quiz on {topic}. Create exactly {count} "hard" questions testing deep critical understanding.`,
+  medium: `You are a professional quiz master create a intermediate quiz on {topic}. Create exactly {count} "medium" questions testing applied knowledge.`,
+  hard: `You are a professional quiz master create a advanced quiz on {topic}. Create exactly {count} "hard" questions testing deep critical understanding.`,
 };
 
 const jsonResponseInstruction = `
@@ -20,8 +20,15 @@ Respond ONLY with valid JSON in this exact format:
     {
       "question": "Question text",
       "options": ["A: Answer A", "B: Answer B", "C: Answer C", "D: Answer D"],
-      "answer": "Option B: Answer B"
+      "answer": "B: Answer B"
     }
+  ]
+  example: [
+  {
+    "question": "What is the capital of France?",
+    "options": ["A: Berlin", "B: Madrid", "C: Paris", "D: Rome"],
+    "answer": "C: Paris"
+  }
   ]
 }
 No explanations, no extra text. Only the JSON object.`;

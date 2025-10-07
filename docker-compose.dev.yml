@@ -1,0 +1,42 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: DockerFile.dev
+    container_name: backend_dev
+    ports:
+      - '5000:5000'
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/usr/src/app:delegated
+      - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development
+    networks:
+      - myapp-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: DockerFile.dev
+    container_name: frontend_dev
+    ports:
+      - '3000:3000'
+    env_file:
+      - ./frontend/.env # optional: keep local dev env here
+    volumes:
+      - ./frontend:/usr/src/app:delegated
+      - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development
+      # make frontend call backend via docker network
+      - NEXT_PUBLIC_API_URL=http://backend:5000
+    depends_on:
+      - backend
+    networks:
+      - myapp-network
+
+networks:
+  myapp-network:
+    driver: bridge

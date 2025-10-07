@@ -1,13 +1,13 @@
-"use client"
+import NavBar from '@/components/Navbar';
+import Hero from '@/components/Hero';
+import About from '@/components/About';
+import Features from '@/components/Features';
+import Story from '@/components/Story';
+import Contact from '@/components/Contact';
+import Footer from '@/components/Footer';
+import { AuthProvider } from '@/contexts/AuthContext';
 
-import NavBar from "@/components/Navbar"
-import Hero from "@/components/Hero"
-import About from "@/components/About"
-import Features from "@/components/Features"
-import Story from "@/components/Story"
-import Contact from "@/components/Contact"
-import Footer from "@/components/Footer"
-import { AuthProvider } from "@/contexts/AuthContext"
+export const dynamic = 'force-static';
 
 function App() {
   return (
@@ -22,7 +22,7 @@ function App() {
         <Footer />
       </main>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;

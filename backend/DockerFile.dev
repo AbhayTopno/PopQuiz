@@ -1,0 +1,14 @@
+# backend/Dockerfile.dev (development)
+FROM node:22-alpine
+RUN apk add --no-cache bash git && npm install -g pnpm@latest
+WORKDIR /usr/src/app
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install
+
+# Copy source (note: docker-compose.dev will mount your local folder over this)
+COPY . .
+
+EXPOSE 5000
+ENV NODE_ENV=development
+CMD ["pnpm", "run", "dev"]

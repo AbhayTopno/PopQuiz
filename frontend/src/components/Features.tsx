@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { TiLocationArrow } from 'react-icons/ti';
 import { BentoTiltProps, BentoCardProps } from '../types';

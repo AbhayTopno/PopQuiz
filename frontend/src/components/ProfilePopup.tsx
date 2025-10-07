@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import gsap from 'gsap';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -68,8 +69,13 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
     try {
       await updateProfile({ username, email, avatar });
       setIsEditing(false);
-    } catch (err: any) {
-      setError(err.message || 'Profile update failed. Please try again.');
+    } catch (err) {
+      const defaultMessage = 'Profile update failed. Please try again.';
+      if (err instanceof Error && err.message) {
+        setError(err.message);
+      } else {
+        setError(defaultMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -117,12 +123,13 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
         {!isEditing ? (
           <div className="space-y-6">
             <div className="flex flex-col items-center">
-              <div className="mb-4 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-white/30 bg-gradient-to-br from-blue-500 to-purple-600">
+              <div className="relative mb-4 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-white/30 bg-gradient-to-br from-blue-500 to-purple-600">
                 {avatar ? (
-                  <img
+                  <Image
                     src={avatar || '/placeholder.svg'}
                     alt={username}
-                    className="h-full w-full object-cover"
+                    fill
+                    className="object-cover"
                   />
                 ) : (
                   <span className="font-zentry text-3xl font-black text-white">
@@ -194,7 +201,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
             </div>
 
             {error && (
-              <div className="rounded-lg bg-red-500/20 border border-red-500/50 px-4 py-2 text-sm text-red-200">
+              <div className="rounded-lg border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm text-red-200">
                 {error}
               </div>
             )}
@@ -202,7 +209,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full rounded-lg bg-blue-500 px-4 py-3 font-general font-semibold uppercase text-white transition-all hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-lg bg-blue-500 px-4 py-3 font-general font-semibold uppercase text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? 'Saving...' : 'Save Changes'}
             </button>

@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: DockerFile
+      target: production
+    container_name: myapp_backend_prod
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - '5000:5000'
+    networks:
+      - myapp-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: DockerFile
+      target: production
+    container_name: myapp_frontend_prod
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env # optional for other frontend envs
+    environment:
+      - NODE_ENV=production
+      # let frontend server components call backend using service name inside network
+      - NEXT_PUBLIC_API_URL=http://backend:5000
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+    networks:
+      - myapp-network
+
+networks:
+  myapp-network:
+    driver: bridge

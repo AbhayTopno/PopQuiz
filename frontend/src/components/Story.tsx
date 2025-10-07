@@ -1,8 +1,11 @@
+'use client';
+
 import React, { useRef } from 'react';
 import gsap from 'gsap';
 
 import Button from './Button';
 import AnimatedTitle from './AnimatedTitle';
+import Image from 'next/image';
 
 const FloatingImage: React.FC = () => {
   const frameRef = useRef<HTMLImageElement | null>(null);
@@ -61,7 +64,7 @@ const FloatingImage: React.FC = () => {
           <div className="story-img-container">
             <div className="story-img-mask">
               <div className="story-img-content">
-                <img
+                <Image
                   ref={frameRef}
                   onMouseMove={handleMouseMove}
                   onMouseLeave={handleMouseLeave}
@@ -70,6 +73,7 @@ const FloatingImage: React.FC = () => {
                   src="/img/entrance.webp"
                   alt="entrance.webp"
                   className="object-contain"
+                  fill
                 />
               </div>
             </div>

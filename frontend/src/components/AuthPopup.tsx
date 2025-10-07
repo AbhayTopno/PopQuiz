@@ -87,11 +87,15 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
       setEmail('');
       setPassword('');
       setUsername('');
-    } catch (err: any) {
-      setError(
-        err.message ||
-          (isLogin ? 'Invalid credentials' : 'Signup failed. Please try again.')
-      );
+    } catch (err) {
+      const defaultMessage = isLogin
+        ? 'Invalid credentials'
+        : 'Signup failed. Please try again.';
+      if (err instanceof Error && err.message) {
+        setError(err.message);
+      } else {
+        setError(defaultMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -177,7 +181,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-500/20 border border-red-500/50 px-4 py-2 text-sm text-red-200">
+            <div className="rounded-lg border border-red-500/50 bg-red-500/20 px-4 py-2 text-sm text-red-200">
               {error}
             </div>
           )}
@@ -185,7 +189,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full rounded-lg bg-blue-500 px-4 py-3 font-general font-semibold uppercase text-white transition-all hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-lg bg-blue-500 px-4 py-3 font-general font-semibold uppercase text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLoading ? 'Processing...' : isLogin ? 'Login' : 'Sign Up'}
           </button>
