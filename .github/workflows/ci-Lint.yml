@@ -1,14 +1,17 @@
 name: CI — Lint & Security
 
 on:
-  pull_request:
-    branches: [main]
   push:
-    branches: [main]
+    branches:
+      - '**' # ✅ run on all branches
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch: # ✅ manual run from GitHub UI
 
 permissions:
   contents: read
-  security-events: write # needed for CodeQL
+  security-events: write # for CodeQL
 
 jobs:
   # -----------------------------
@@ -26,9 +29,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          cache: 'pnpm'
 
-      - run: npm install -g pnpm
+      - uses: pnpm/action-setup@v4 # ✅ install pnpm
+        with:
+          version: 9
+
       - run: pnpm install --frozen-lockfile || pnpm install
 
       # Run ESLint
@@ -37,7 +43,7 @@ jobs:
       # Run Prettier
       - run: pnpm prettier --check "src/**/*.{js,jsx,ts,tsx,json,md,css,scss}"
 
-      # Run Stylelint
+      # Run Stylelint (CSS/Tailwind)
       - run: pnpm stylelint "src/**/*.{css,scss}" --allow-empty-input
 
   # -----------------------------
@@ -55,9 +61,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          cache: 'pnpm'
 
-      - run: npm install -g pnpm
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - run: pnpm install --frozen-lockfile || pnpm install
 
       # Run ESLint
@@ -102,12 +111,12 @@ jobs:
       - run: docker build -t myapp-frontend ./frontend
       - uses: aquasecurity/trivy-action@0.33.1
         with:
-          scan-type: image
-          image-ref: myapp-frontend
-          format: table
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          exit-code: 1
+          scan-type: 'image'
+          image-ref: 'myapp-frontend'
+          format: 'table'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
 
   # -----------------------------
   # Backend Trivy scan
@@ -121,12 +130,12 @@ jobs:
       - run: docker build -t myapp-backend ./backend
       - uses: aquasecurity/trivy-action@0.33.1
         with:
-          scan-type: image
-          image-ref: myapp-backend
-          format: table
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          exit-code: 1
+          scan-type: 'image'
+          image-ref: 'myapp-backend'
+          format: 'table'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
 
   # -----------------------------
   # CodeQL static analysis
