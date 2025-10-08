@@ -39,9 +39,7 @@ const Contact: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center text-center">
-          <p className="mb-10 font-general text-[10px] uppercase">
-            Join PopQuiz
-          </p>
+          <p className="mb-10 font-general text-[10px] uppercase">Join PopQuiz</p>
 
           <AnimatedTitle
             title="reach o<b>u</b>t and<br /> sh<b>a</b>re your <br /><b>q</b>uiz i<b>d</b>eas"

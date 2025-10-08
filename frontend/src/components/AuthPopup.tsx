@@ -28,12 +28,12 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
       gsap.fromTo(
         overlayRef.current,
         { opacity: 0 },
-        { opacity: 1, duration: 0.3, ease: 'power2.out' }
+        { opacity: 1, duration: 0.3, ease: 'power2.out' },
       );
       gsap.fromTo(
         popupRef.current,
         { scale: 0.8, opacity: 0, y: 50 },
-        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' }
+        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' },
       );
     } else {
       // Animate popup exit
@@ -88,9 +88,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
       setPassword('');
       setUsername('');
     } catch (err) {
-      const defaultMessage = isLogin
-        ? 'Invalid credentials'
-        : 'Signup failed. Please try again.';
+      const defaultMessage = isLogin ? 'Invalid credentials' : 'Signup failed. Please try again.';
       if (err instanceof Error && err.message) {
         setError(err.message);
       } else {
@@ -138,9 +136,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
-              <label className="mb-2 block font-general text-sm text-white/80">
-                Username
-              </label>
+              <label className="mb-2 block font-general text-sm text-white/80">Username</label>
               <input
                 type="text"
                 value={username}
@@ -153,9 +149,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
           )}
 
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">
-              Email
-            </label>
+            <label className="mb-2 block font-general text-sm text-white/80">Email</label>
             <input
               type="email"
               value={email}
@@ -167,9 +161,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
           </div>
 
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">
-              Password
-            </label>
+            <label className="mb-2 block font-general text-sm text-white/80">Password</label>
             <input
               type="password"
               value={password}
@@ -203,9 +195,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
             }}
             className="font-general text-sm text-white/70 transition-colors hover:text-white"
           >
-            {isLogin
-              ? "Don't have an account? Sign Up"
-              : 'Already have an account? Login'}
+            {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Login'}
           </button>
         </div>
       </div>

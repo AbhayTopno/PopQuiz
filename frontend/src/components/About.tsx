@@ -36,9 +36,7 @@ const About: React.FC = () => {
       className="min-h-screen w-screen flex flex-col items-center justify-center text-center"
     >
       <div className="relative mb-8 mt-36 flex flex-col items-center gap-5">
-        <p className="font-general text-sm uppercase md:text-[10px]">
-          Welcome to PopQuiz
-        </p>
+        <p className="font-general text-sm uppercase md:text-[10px]">Welcome to PopQuiz</p>
 
         <AnimatedTitle
           title="Ch<b>a</b>llenge your mind <br /> in the ult<b>i</b>mate quiz adventure"
@@ -48,8 +46,8 @@ const About: React.FC = () => {
         <div className="about-subtext">
           <p>Test your knowledge across genres, solo or with friends</p>
           <p className="text-gray-500">
-            PopQuiz brings real-time duels, group battles, and AI-powered
-            quizzes into one exciting platform for everyone.
+            PopQuiz brings real-time duels, group battles, and AI-powered quizzes into one exciting
+            platform for everyone.
           </p>
         </div>
       </div>

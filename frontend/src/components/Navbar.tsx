@@ -92,26 +92,14 @@ const NavBar: React.FC = () => {
             <div className="flex h-full items-center gap-4">
               <div className="hidden md:block">
                 {navItems.map((item, index) => (
-                  <a
-                    key={index}
-                    href={`#${item.toLowerCase()}`}
-                    className="nav-hover-btn"
-                  >
+                  <a key={index} href={`#${item.toLowerCase()}`} className="nav-hover-btn">
                     {item}
                   </a>
                 ))}
               </div>
 
-              <button
-                onClick={toggleAudioIndicator}
-                className="ml-6 flex items-center space-x-0.5"
-              >
-                <audio
-                  ref={audioElementRef}
-                  className="hidden"
-                  src="/audio/loop.mp3"
-                  loop
-                />
+              <button onClick={toggleAudioIndicator} className="ml-6 flex items-center space-x-0.5">
+                <audio ref={audioElementRef} className="hidden" src="/audio/loop.mp3" loop />
                 {[1, 2, 3, 4].map((bar) => (
                   <div
                     key={bar}
@@ -164,14 +152,8 @@ const NavBar: React.FC = () => {
         </header>
       </div>
 
-      <AuthPopup
-        isOpen={isAuthPopupOpen}
-        onClose={() => setIsAuthPopupOpen(false)}
-      />
-      <ProfilePopup
-        isOpen={isProfilePopupOpen}
-        onClose={() => setIsProfilePopupOpen(false)}
-      />
+      <AuthPopup isOpen={isAuthPopupOpen} onClose={() => setIsAuthPopupOpen(false)} />
+      <ProfilePopup isOpen={isProfilePopupOpen} onClose={() => setIsProfilePopupOpen(false)} />
     </>
   );
 };

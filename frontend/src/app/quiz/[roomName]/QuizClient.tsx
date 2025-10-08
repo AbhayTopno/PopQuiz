@@ -5,10 +5,7 @@ import { QuizData, Props } from '@/types';
 
 const FEEDBACK_DELAY_MS = 3000; // Delay for showing feedback before next question
 
-export default function QuizClient({
-  initialQuizData,
-  initialDuration,
-}: Props) {
+export default function QuizClient({ initialQuizData, initialDuration }: Props) {
   // --- State (use server-provided initial data)
   const [quizData] = useState<QuizData | null>(initialQuizData ?? null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -45,8 +42,7 @@ export default function QuizClient({
 
       if (
         selectedOption &&
-        selectedOption ===
-          quizData.questions[currentQuestionIndex].correctAnswer
+        selectedOption === quizData.questions[currentQuestionIndex].correctAnswer
       ) {
         setScore((prev) => prev + 1);
       }
@@ -67,7 +63,7 @@ export default function QuizClient({
         }, 300);
       }, FEEDBACK_DELAY_MS);
     },
-    [quizData, currentQuestionIndex, duration]
+    [quizData, currentQuestionIndex, duration],
   );
 
   // Timer countdown effect
@@ -85,14 +81,7 @@ export default function QuizClient({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [
-    isLoading,
-    isFinished,
-    showFeedback,
-    currentQuestionIndex,
-    duration,
-    handleNext,
-  ]);
+  }, [isLoading, isFinished, showFeedback, currentQuestionIndex, duration, handleNext]);
 
   // --- UI helpers (restored classes & styles) ---
   const getButtonClass = (option: string) => {
@@ -133,10 +122,7 @@ export default function QuizClient({
   // Error UI (restored)
   if (error || !quizData) {
     return (
-      <div
-        className="flex-center flex-col h-screen p-4 text-center"
-        style={backgroundStyle}
-      >
+      <div className="flex-center flex-col h-screen p-4 text-center" style={backgroundStyle}>
         <div className="w-full max-w-md bg-black/50 p-8 rounded-2xl border border-red-500/50 shadow-lg backdrop-blur-md">
           <h1 className="font-zentry text-4xl font-black uppercase text-red-500 mb-4 [text-shadow:_0_0_8px_rgb(239_68_68_/_50%)]">
             Error
@@ -165,9 +151,7 @@ export default function QuizClient({
           <h1 className="font-zentry text-4xl md:text-5xl font-black uppercase text-white mb-4 [text-shadow:_0_0_7px_#fff]">
             Quiz Complete!
           </h1>
-          <p className="font-general text-2xl capitalize text-cyan-300 mb-8">
-            {quizData.topic}
-          </p>
+          <p className="font-general text-2xl capitalize text-cyan-300 mb-8">{quizData.topic}</p>
 
           <div className="relative w-48 h-48 mx-auto mb-8 flex-center">
             <svg className="w-full h-full" viewBox="0 0 100 100">
@@ -184,9 +168,7 @@ export default function QuizClient({
                 className="text-cyan-400"
                 strokeWidth="8"
                 strokeDasharray={`${2 * Math.PI * 44}`}
-                strokeDashoffset={`${
-                  2 * Math.PI * 44 * (1 - percentage / 100)
-                }`}
+                strokeDashoffset={`${2 * Math.PI * 44 * (1 - percentage / 100)}`}
                 strokeLinecap="round"
                 stroke="currentColor"
                 fill="transparent"
@@ -200,17 +182,12 @@ export default function QuizClient({
                 }}
               />
             </svg>
-            <span className="absolute text-5xl font-zentry text-white">
-              {percentage}%
-            </span>
+            <span className="absolute text-5xl font-zentry text-white">{percentage}%</span>
           </div>
 
           <p className="font-general text-3xl text-white mb-8">
-            You scored <span className="font-bold text-cyan-300">{score}</span>{' '}
-            out of{' '}
-            <span className="font-bold text-cyan-300">
-              {quizData.questions.length}
-            </span>
+            You scored <span className="font-bold text-cyan-300">{score}</span> out of{' '}
+            <span className="font-bold text-cyan-300">{quizData.questions.length}</span>
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4">
@@ -246,10 +223,7 @@ export default function QuizClient({
   const isTimeLow = timeLeft <= 5;
 
   return (
-    <div
-      className="flex-center flex-col min-h-screen p-4 md:p-8"
-      style={backgroundStyle}
-    >
+    <div className="flex-center flex-col min-h-screen p-4 md:p-8" style={backgroundStyle}>
       <div
         className={`w-full max-w-3xl transition-opacity duration-300 ${
           isFadingOut ? 'opacity-0' : 'opacity-100'
@@ -297,9 +271,7 @@ export default function QuizClient({
                 onClick={() => handleNext(option)}
                 disabled={showFeedback}
                 className={getButtonClass(option)}
-                aria-label={`Option ${String.fromCharCode(
-                  65 + index
-                )}: ${cleanOption(option)}`}
+                aria-label={`Option ${String.fromCharCode(65 + index)}: ${cleanOption(option)}`}
               >
                 <span className="font-semibold mr-4 bg-cyan-500/80 text-black rounded px-2 py-0.5">
                   {String.fromCharCode(65 + index)}
@@ -309,9 +281,7 @@ export default function QuizClient({
             ))}
           </div>
           {showFeedback && selectedAnswer === null && (
-            <p className="mt-4 text-center text-red-300 font-general">
-              Time&apos;s up!
-            </p>
+            <p className="mt-4 text-center text-red-300 font-general">Time&apos;s up!</p>
           )}
         </div>
       </div>

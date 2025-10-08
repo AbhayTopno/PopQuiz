@@ -1,39 +1,46 @@
 // frontend/eslint.config.mjs
-import { FlatCompat } from '@eslint/eslintrc';
-import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import globals from 'globals';
-import prettierConfig from 'eslint-config-prettier';
+import { FlatCompat } from "@eslint/eslintrc";
+import js from "@eslint/js";
+import prettierConfig from "eslint-config-prettier";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+import globals from "globals";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
+import tsParser from "@typescript-eslint/parser";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
+  baseDirectory: __dirname,
 });
 
 export default [
   js.configs.recommended,
-  ...tseslint.configs.recommended,
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
+    files: ["**/*.{ts,tsx}"],
     languageOptions: {
-      parser: tseslint.parser,
+      parser: tsParser,
       parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        project: './tsconfig.json',
+        ecmaVersion: "latest",
+        sourceType: "module",
+        project: "./tsconfig.json",
       },
       globals: {
         ...globals.browser,
         ...globals.node,
       },
     },
+    plugins: {
+      "@typescript-eslint": tsPlugin,
+    },
     rules: {
-      'react/react-in-jsx-scope': 'off', // Next.js already handles React
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        { argsIgnorePattern: '^_' },
+      "react/react-in-jsx-scope": "off", // Next.js handles React
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_" },
       ],
-      'no-console': 'warn',
+      "no-console": "warn", // <- now console statements are errors
     },
   },
   prettierConfig,

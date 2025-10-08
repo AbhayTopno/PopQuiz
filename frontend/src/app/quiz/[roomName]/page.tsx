@@ -42,12 +42,9 @@ export default async function QuizPage({ params, searchParams }: Props) {
   }
 
   // SSR fetch: fresh on every request
-  const res = await fetch(
-    `${apiBase}/api/quiz/${encodeURIComponent(roomName)}`,
-    {
-      cache: 'no-store',
-    }
-  );
+  const res = await fetch(`${apiBase}/api/quiz/${encodeURIComponent(roomName)}`, {
+    cache: 'no-store',
+  });
 
   if (!res.ok) {
     if (res.status === 404) return notFound();
@@ -55,12 +52,8 @@ export default async function QuizPage({ params, searchParams }: Props) {
     return (
       <div className="flex-center h-screen p-4">
         <div className="max-w-xl w-full bg-black/50 p-6 rounded-lg text-center">
-          <h2 className="text-2xl font-bold text-red-400 mb-4">
-            Failed to load quiz
-          </h2>
-          <p className="text-gray-300 mb-4">
-            Server responded with status {res.status}.
-          </p>
+          <h2 className="text-2xl font-bold text-red-400 mb-4">Failed to load quiz</h2>
+          <p className="text-gray-300 mb-4">Server responded with status {res.status}.</p>
           <Link href="/" className="underline text-cyan-300">
             Go Home
           </Link>

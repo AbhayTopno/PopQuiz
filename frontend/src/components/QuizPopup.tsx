@@ -37,19 +37,19 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
     }
   }, [topic, open]);
 
-  // Animation effect for popup entrance and exit
+  // Animation effect for popup entrance
   useEffect(() => {
     if (open) {
-      setError(null); // Clear any previous errors
+      setError(null);
       gsap.fromTo(
         overlayRef.current,
         { opacity: 0 },
-        { opacity: 1, duration: 0.3, ease: 'power2.out' }
+        { opacity: 1, duration: 0.3, ease: 'power2.out' },
       );
       gsap.fromTo(
         popupRef.current,
         { scale: 0.8, opacity: 0, y: 50 },
-        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' }
+        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' },
       );
     }
   }, [open]);
@@ -100,7 +100,6 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
   };
 
   const handleStart = async () => {
-    // Validate inputs
     if (!quizTopic.trim()) {
       setError('Please provide a quiz topic');
       return;
@@ -137,7 +136,6 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
 
       const result = await response.json();
 
-      // Navigate to the quiz page using the returned quizId with duration parameter
       if (result.quizId) {
         router.push(`/quiz/${result.quizId}?duration=${finalDuration}`);
         handleClose();
@@ -145,11 +143,12 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
         throw new Error('No quiz ID returned from server');
       }
     } catch (error) {
-      console.error('Error generating quiz:', error);
+      // ✅ Log only in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error generating quiz:', error);
+      }
       setError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to generate quiz. Please try again.'
+        error instanceof Error ? error.message : 'Failed to generate quiz. Please try again.',
       );
     } finally {
       setIsSubmitting(false);
@@ -164,8 +163,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
   const toggleButtonBaseClass =
     'px-4 py-2 rounded-lg font-general text-sm font-semibold uppercase transition-colors';
   const toggleButtonActiveClass = 'bg-blue-500 text-white';
-  const toggleButtonInactiveClass =
-    'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white';
+  const toggleButtonInactiveClass = 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white';
 
   return (
     <div
@@ -174,7 +172,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
       onClick={handleOverlayClick}
       style={{
         backdropFilter: 'blur(10px)',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
       }}
     >
       <div
@@ -195,11 +193,9 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
         </h2>
 
         <div className="space-y-4">
-          {/* Topic Input - Always show with default value */}
+          {/* Topic Input */}
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">
-              Quiz Topic
-            </label>
+            <label className="mb-2 block font-general text-sm text-white/80">Quiz Topic</label>
             <input
               type="text"
               value={quizTopic}
@@ -211,18 +207,14 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
 
           {/* Difficulty */}
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">
-              Difficulty
-            </label>
+            <label className="mb-2 block font-general text-sm text-white/80">Difficulty</label>
             <div className="flex gap-2">
               {difficulties.map((d) => (
                 <button
                   key={d}
                   onClick={() => setDifficulty(d)}
                   className={`${toggleButtonBaseClass} ${
-                    difficulty === d
-                      ? toggleButtonActiveClass
-                      : toggleButtonInactiveClass
+                    difficulty === d ? toggleButtonActiveClass : toggleButtonInactiveClass
                   }`}
                 >
                   {d}
@@ -233,18 +225,14 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
 
           {/* Battle Type */}
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">
-              Battle Type
-            </label>
+            <label className="mb-2 block font-general text-sm text-white/80">Battle Type</label>
             <div className="flex flex-wrap gap-2">
               {battleTypes.map((type) => (
                 <button
                   key={type}
                   onClick={() => setBattleType(type)}
                   className={`${toggleButtonBaseClass} ${
-                    battleType === type
-                      ? toggleButtonActiveClass
-                      : toggleButtonInactiveClass
+                    battleType === type ? toggleButtonActiveClass : toggleButtonInactiveClass
                   }`}
                 >
                   {type}
@@ -253,14 +241,9 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
             </div>
           </div>
 
-          {/* Custom Battle Type Options (Animated) */}
-          <div
-            ref={customTeamRef}
-            className="h-0 space-y-4 overflow-hidden opacity-0"
-          >
-            <label className="block font-general text-sm text-white/80">
-              Custom Teams
-            </label>
+          {/* Custom Teams */}
+          <div ref={customTeamRef} className="h-0 space-y-4 overflow-hidden opacity-0">
+            <label className="block font-general text-sm text-white/80">Custom Teams</label>
             <div className="flex items-center gap-4">
               <input
                 type="number"
@@ -280,26 +263,22 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
             </div>
           </div>
 
+          {/* Questions & Duration */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Number of Questions */}
             <div>
-              <label className="mb-2 block font-general text-sm text-white/80">
-                Questions
-              </label>
+              <label className="mb-2 block font-general text-sm text-white/80">Questions</label>
               <input
                 type="number"
                 value={questionCount}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setQuestionCount(value === '' ? '' : parseInt(value));
-                }}
+                onChange={(e) =>
+                  setQuestionCount(e.target.value === '' ? '' : parseInt(e.target.value))
+                }
                 className={inputClass}
                 min={1}
                 max={50}
               />
             </div>
 
-            {/* Duration per Question */}
             <div>
               <label className="mb-2 block font-general text-sm text-white/80">
                 Duration (sec)
@@ -307,10 +286,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
               <input
                 type="number"
                 value={duration}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setDuration(value === '' ? '' : parseInt(value));
-                }}
+                onChange={(e) => setDuration(e.target.value === '' ? '' : parseInt(e.target.value))}
                 className={inputClass}
                 min={5}
                 max={300}
@@ -325,7 +301,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
             </div>
           )}
 
-          {/* Action Button */}
+          {/* Start Button */}
           <div className="pt-4">
             <button
               onClick={handleStart}
