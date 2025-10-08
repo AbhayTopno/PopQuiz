@@ -58,7 +58,7 @@ jobs:
   # -----------------------------
   # Backend Lint
   # -----------------------------
-backend-lint:
+  backend-lint:
     name: Backend Lint (ESLint / Prettier)
     runs-on: ubuntu-latest
     defaults:
@@ -129,7 +129,7 @@ backend-lint:
     needs: [frontend-lint, secret-scan]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t myapp-frontend ./frontend
+      - run: docker build -t myapp-frontend -f DockerFile ./frontend
       - uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'image'
@@ -148,7 +148,7 @@ backend-lint:
     needs: [backend-lint, secret-scan]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t myapp-backend ./backend
+      - run: docker build -t myapp-backend -f DockerFile ./backend
       - uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'image'
