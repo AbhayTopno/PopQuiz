@@ -154,7 +154,7 @@ git push origin feature/my-new-feature
 
 ### If your key is leaked, revoke it immediately from the Groq Console.
 
-# 🌈 Why Contribute to PopQuiz?
+# Why Contribute to PopQuiz?
 
 #### Learn: Dive into a modern full-stack app with Next.js, TypeScript, and AI integration.
 
