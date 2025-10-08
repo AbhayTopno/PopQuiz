@@ -129,7 +129,7 @@ jobs:
     needs: [frontend-lint, secret-scan]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t myapp-frontend ./frontend
+      - run: docker build -t myapp-frontend -f DockerFile ./frontend
       - uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'image'
@@ -148,7 +148,7 @@ jobs:
     needs: [backend-lint, secret-scan]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t myapp-backend ./backend
+      - run: docker build -t myapp-backend -f DockerFile ./backend
       - uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'image'
