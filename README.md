@@ -75,7 +75,7 @@ cp .env.example .env
 
 ### This tells the frontend where to find the backend. Easy peasy! 😎
 
-## 🐳 Run with Docker (Recommended) 🐳
+## 🐳 Run with Docker (Recommended)
 
 ### Docker Compose makes it super simple to run the frontend, backend, and MongoDB together! 🚀
 
