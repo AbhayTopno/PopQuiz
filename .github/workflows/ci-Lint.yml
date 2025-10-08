@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: read
-  security-events: write # for CodeQL
+  security-events: write # needed for CodeQL
 
 jobs:
   # -----------------------------
@@ -17,22 +17,28 @@ jobs:
   frontend-lint:
     name: Frontend Lint (ESLint / Prettier / Stylelint)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 22
+          cache: pnpm
+
       - run: npm install -g pnpm
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-frontend-${{ hashFiles('frontend/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-frontend-
       - run: pnpm install --frozen-lockfile || pnpm install
-        working-directory: frontend
-      - run: pnpm dlx eslint "frontend/**/*.{js,jsx,ts,tsx}" --max-warnings=0
-      - run: pnpm dlx prettier --check frontend/
-      - run: pnpm dlx stylelint "frontend/**/*.{css,scss,html,vue}" --allow-empty-input || true
+
+      # Run ESLint
+      - run: pnpm eslint "src/**/*.{js,jsx,ts,tsx}" --max-warnings=0
+
+      # Run Prettier
+      - run: pnpm prettier --check "src/**/*.{js,jsx,ts,tsx,json,md,css,scss}"
+
+      # Run Stylelint
+      - run: pnpm stylelint "src/**/*.{css,scss}" --allow-empty-input
 
   # -----------------------------
   # Backend Lint
@@ -40,21 +46,25 @@ jobs:
   backend-lint:
     name: Backend Lint (ESLint / Prettier)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 22
+          cache: pnpm
+
       - run: npm install -g pnpm
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-backend-${{ hashFiles('backend/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-backend-
       - run: pnpm install --frozen-lockfile || pnpm install
-        working-directory: backend
-      - run: pnpm dlx eslint "backend/**/*.{js,ts}" --max-warnings=0
-      - run: pnpm dlx prettier --check backend/
+
+      # Run ESLint
+      - run: pnpm eslint "src/**/*.{js,ts}" --max-warnings=0
+
+      # Run Prettier
+      - run: pnpm prettier --check "src/**/*.{js,ts,json,md}"
 
   # -----------------------------
   # Detect hardcoded secrets
@@ -72,7 +82,6 @@ jobs:
           git clone https://github.com/awslabs/git-secrets.git
           cd git-secrets && sudo make install
           cd ..
-          # Add generic patterns for secrets
           git secrets --add 'API[_-]?KEY[=|:][^\s]+'
           git secrets --add 'SECRET[=|:][^\s]+'
           git secrets --add 'PASSWORD[=|:][^\s]+'
@@ -93,12 +102,12 @@ jobs:
       - run: docker build -t myapp-frontend ./frontend
       - uses: aquasecurity/trivy-action@0.33.1
         with:
-          scan-type: 'image'
-          image-ref: 'myapp-frontend'
-          format: 'table'
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '1'
+          scan-type: image
+          image-ref: myapp-frontend
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          exit-code: 1
 
   # -----------------------------
   # Backend Trivy scan
@@ -112,12 +121,12 @@ jobs:
       - run: docker build -t myapp-backend ./backend
       - uses: aquasecurity/trivy-action@0.33.1
         with:
-          scan-type: 'image'
-          image-ref: 'myapp-backend'
-          format: 'table'
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '1'
+          scan-type: image
+          image-ref: myapp-backend
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          exit-code: 1
 
   # -----------------------------
   # CodeQL static analysis

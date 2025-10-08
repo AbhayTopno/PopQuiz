@@ -1,4 +1,4 @@
-// eslint.config.js
+// backend/eslint.config.mjs
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import globals from 'globals';
@@ -9,20 +9,19 @@ export default [
   {
     files: ['**/*.{js,mjs,cjs,ts}'],
     languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        sourceType: 'module',
+        ecmaVersion: 'latest',
+        project: './tsconfig.json',
+      },
       globals: {
         ...globals.node,
       },
-      // --- ADD THIS BLOCK ---
-      parserOptions: {
-        // Tell ESLint to parse files as ES Modules
-        sourceType: 'module',
-        // Allow for the latest ECMAScript features
-        ecmaVersion: 'latest',
-      },
-      // --------------------
     },
     rules: {
-      // Your custom rules here
+      'no-console': 'warn',
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
 ];
