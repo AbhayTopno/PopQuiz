@@ -108,7 +108,6 @@ const Hero: FC = () => {
     });
   });
 
-  // CHANGE 1: Updated selector to target the new specific class
   useGSAP(
     () => {
       gsap.from('.dynamic-title', {
@@ -121,7 +120,9 @@ const Hero: FC = () => {
     { dependencies: [backgroundIndex] },
   );
 
-  const getVideoSrc = (index: number): string => `videos/hero-${index}.hevc.mp4`;
+  // Replaced local path with CDN URL
+  const getVideoSrc = (index: number): string =>
+    `https://cdn.jsdelivr.net/gh/AbhayTopno/Resources@1.0.0/hero-${index}.hevc.mp4`;
 
   const openPopup = () => {
     const currentTitle = videoTitles[backgroundIndex - 1]
@@ -198,7 +199,6 @@ const Hero: FC = () => {
           />
         </div>
 
-        {/* CHANGE 2: Added 'dynamic-title' class */}
         <h1
           key={`title-1-${backgroundIndex}`}
           className="dynamic-title special-font hero-heading absolute bottom-5 right-5 z-40 text-blue-75"
@@ -224,7 +224,6 @@ const Hero: FC = () => {
         </div>
       </div>
 
-      {/* CHANGE 2: Added 'dynamic-title' class */}
       <h1
         key={`title-2-${backgroundIndex}`}
         className="dynamic-title special-font hero-heading absolute bottom-5 right-5 text-black"
