@@ -1,5 +1,5 @@
-import Groq from 'groq-sdk';
-import dotenv from 'dotenv';
+import Groq from "groq-sdk";
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -35,27 +35,27 @@ No explanations, no extra text. Only the JSON object.`;
 
 export async function generateQuiz(
   topic: string,
-  difficulty: string = 'medium',
-  count: number = 5
+  difficulty: string = "medium",
+  count: number = 5,
 ) {
   const persona =
     promptPersonas[difficulty.toLowerCase()] || promptPersonas.medium;
 
   const prompt =
-    persona.replace('{topic}', topic).replace('{count}', count.toString()) +
+    persona.replace("{topic}", topic).replace("{count}", count.toString()) +
     jsonResponseInstruction;
 
   try {
     const chatCompletion = await groq.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
-      model: 'llama-3.1-8b-instant',
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      model: "llama-3.1-8b-instant",
     });
 
     const content = chatCompletion.choices[0]?.message?.content;
 
     if (!content) {
-      throw new Error('No content returned from Groq');
+      throw new Error("No content returned from Groq");
     }
 
     const parsedContent = JSON.parse(content);
@@ -63,14 +63,14 @@ export async function generateQuiz(
     // Validate the structure of the AI's response before returning it
     if (!parsedContent.questions || !Array.isArray(parsedContent.questions)) {
       throw new Error(
-        'Invalid JSON structure from AI: "questions" array is missing or not an array.'
+        'Invalid JSON structure from AI: "questions" array is missing or not an array.',
       );
     }
 
-    console.log('Groq response validated successfully.');
+    console.log("Groq response validated successfully.");
     return parsedContent;
   } catch (err) {
-    console.error('Groq Service Error:', err);
-    throw new Error('Failed to generate quiz from AI service.');
+    console.error("Groq Service Error:", err);
+    throw new Error("Failed to generate quiz from AI service.");
   }
 }

@@ -57,3 +57,20 @@ export type Props = {
   initialQuizData: QuizData;
   initialDuration?: number;
 };
+
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  isAdmin: boolean;
+  avatar?: string;
+}
+
+export interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (username: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+}

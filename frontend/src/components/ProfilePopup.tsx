@@ -36,12 +36,12 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
       gsap.fromTo(
         overlayRef.current,
         { opacity: 0 },
-        { opacity: 1, duration: 0.3, ease: 'power2.out' }
+        { opacity: 1, duration: 0.3, ease: 'power2.out' },
       );
       gsap.fromTo(
         popupRef.current,
         { scale: 0.8, opacity: 0, y: 50 },
-        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' }
+        { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' },
       );
     } else {
       if (popupRef.current && overlayRef.current) {
@@ -137,9 +137,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
                   </span>
                 )}
               </div>
-              <h3 className="font-zentry text-2xl font-bold text-white">
-                {username}
-              </h3>
+              <h3 className="font-zentry text-2xl font-bold text-white">{username}</h3>
               <p className="text-white/80">{email}</p>
             </div>
 
@@ -160,9 +158,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-2 block font-general text-sm text-white/80">
-                Username
-              </label>
+              <label className="mb-2 block font-general text-sm text-white/80">Username</label>
               <input
                 type="text"
                 value={username}
@@ -174,9 +170,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div>
-              <label className="mb-2 block font-general text-sm text-white/80">
-                Email
-              </label>
+              <label className="mb-2 block font-general text-sm text-white/80">Email</label>
               <input
                 type="email"
                 value={email}
@@ -188,9 +182,7 @@ const ProfilePopup: React.FC<ProfilePopupProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div>
-              <label className="mb-2 block font-general text-sm text-white/80">
-                Avatar URL
-              </label>
+              <label className="mb-2 block font-general text-sm text-white/80">Avatar URL</label>
               <input
                 type="text"
                 value={avatar}

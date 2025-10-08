@@ -12,12 +12,7 @@ import QuizPopup from './QuizPopup';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const videoTitles = [
-  'M<b>a</b>rvel',
-  'Web Ser<b>i</b>es',
-  'A<b>n</b>ime',
-  'Footb<b>a</b>ll',
-];
+const videoTitles = ['M<b>a</b>rvel', 'Web Ser<b>i</b>es', 'A<b>n</b>ime', 'Footb<b>a</b>ll'];
 
 const Hero: FC = () => {
   const [currentIndex, setCurrentIndex] = useState<number>(1);
@@ -92,7 +87,7 @@ const Hero: FC = () => {
         });
       }
     },
-    { dependencies: [isNextVideoReady, hasClicked, currentIndex] }
+    { dependencies: [isNextVideoReady, hasClicked, currentIndex] },
   );
 
   useGSAP(() => {
@@ -123,11 +118,10 @@ const Hero: FC = () => {
         ease: 'power3.out',
       });
     },
-    { dependencies: [backgroundIndex] }
+    { dependencies: [backgroundIndex] },
   );
 
-  const getVideoSrc = (index: number): string =>
-    `videos/hero-${index}.hevc.mp4`;
+  const getVideoSrc = (index: number): string => `videos/hero-${index}.hevc.mp4`;
 
   const openPopup = () => {
     const currentTitle = videoTitles[backgroundIndex - 1]
@@ -237,11 +231,7 @@ const Hero: FC = () => {
         dangerouslySetInnerHTML={{ __html: videoTitles[backgroundIndex - 1] }}
       />
 
-      <QuizPopup
-        open={isPopupOpen}
-        onClose={() => setIsPopupOpen(false)}
-        topic={selectedTopic}
-      />
+      <QuizPopup open={isPopupOpen} onClose={() => setIsPopupOpen(false)} topic={selectedTopic} />
     </div>
   );
 };

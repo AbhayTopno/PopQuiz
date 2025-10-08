@@ -51,9 +51,7 @@ const FloatingImage: React.FC = () => {
   return (
     <div id="story" className="min-h-dvh w-screen bg-black text-blue-50">
       <div className="flex size-full flex-col items-center py-10 pb-24">
-        <p className="font-general text-sm uppercase md:text-[10px]">
-          the arena of knowledge
-        </p>
+        <p className="font-general text-sm uppercase md:text-[10px]">the arena of knowledge</p>
 
         <div className="relative size-full">
           <AnimatedTitle
@@ -79,28 +77,17 @@ const FloatingImage: React.FC = () => {
             </div>
 
             {/* for the rounded corner */}
-            <svg
-              className="invisible absolute size-0"
-              xmlns="http://www.w3.org/2000/svg"
-            >
+            <svg className="invisible absolute size-0" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <filter id="flt_tag">
-                  <feGaussianBlur
-                    in="SourceGraphic"
-                    stdDeviation="8"
-                    result="blur"
-                  />
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
                   <feColorMatrix
                     in="blur"
                     mode="matrix"
                     values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 19 -9"
                     result="flt_tag"
                   />
-                  <feComposite
-                    in="SourceGraphic"
-                    in2="flt_tag"
-                    operator="atop"
-                  />
+                  <feComposite in="SourceGraphic" in2="flt_tag" operator="atop" />
                 </filter>
               </defs>
             </svg>
@@ -110,16 +97,11 @@ const FloatingImage: React.FC = () => {
         <div className="-mt-80 flex w-full justify-center md:-mt-64 md:me-44 md:justify-end">
           <div className="flex h-full w-fit flex-col items-center md:items-start">
             <p className="mt-3 max-w-sm text-center font-circular-web text-violet-50 md:text-start">
-              Beyond every question lies a gateway—PopQuiz, where curiosity
-              fuels challenge. Step inside and prove your mastery across
-              infinite realms of knowledge.
+              Beyond every question lies a gateway—PopQuiz, where curiosity fuels challenge. Step
+              inside and prove your mastery across infinite realms of knowledge.
             </p>
 
-            <Button
-              id="realm-btn"
-              title="begin your journey"
-              containerClass="mt-5"
-            />
+            <Button id="realm-btn" title="begin your journey" containerClass="mt-5" />
           </div>
         </div>
       </div>

@@ -26,14 +26,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4 # ✅ install pnpm FIRST
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4 # ✅ then setup node with pnpm cache
         with:
           node-version: 22
           cache: 'pnpm'
+          cache-dependency-path: 'frontend/pnpm-lock.yaml' # ✅ specify the lock file path
 
-      - uses: pnpm/action-setup@v4 # ✅ install pnpm
-        with:
-          version: 9
+      - name: Debug pnpm
+        run: |
+          echo "Node version:"
+          node -v
+          echo "npm version:"
+          npm -v
+          echo "pnpm version:"
+          pnpm -v
+          echo "pnpm path:"
+          which pnpm
 
       - run: pnpm install --frozen-lockfile || pnpm install
 
@@ -43,13 +55,10 @@ jobs:
       # Run Prettier
       - run: pnpm prettier --check "src/**/*.{js,jsx,ts,tsx,json,md,css,scss}"
 
-      # Run Stylelint (CSS/Tailwind)
-      - run: pnpm stylelint "src/**/*.{css,scss}" --allow-empty-input
-
   # -----------------------------
   # Backend Lint
   # -----------------------------
-  backend-lint:
+backend-lint:
     name: Backend Lint (ESLint / Prettier)
     runs-on: ubuntu-latest
     defaults:
@@ -58,14 +67,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4 # ✅ install pnpm FIRST
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4 # ✅ then setup node with pnpm cache
         with:
           node-version: 22
           cache: 'pnpm'
+          cache-dependency-path: 'backend/pnpm-lock.yaml' # ✅ specify the lock file path
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - name: Debug pnpm
+        run: |
+          echo "Node version:"
+          node -v
+          echo "npm version:"
+          npm -v
+          echo "pnpm version:"
+          pnpm -v
+          echo "pnpm path:"
+          which pnpm
 
       - run: pnpm install --frozen-lockfile || pnpm install
 

@@ -5,19 +5,14 @@ import { TiLocationArrow } from 'react-icons/ti';
 import { BentoTiltProps, BentoCardProps } from '../types';
 import QuizPopup from './QuizPopup';
 
-export const BentoTilt: React.FC<BentoTiltProps> = ({
-  children,
-  className = '',
-  onClick,
-}) => {
+export const BentoTilt: React.FC<BentoTiltProps> = ({ children, className = '', onClick }) => {
   const [transformStyle, setTransformStyle] = useState<string>('');
   const itemRef = useRef<HTMLDivElement | null>(null);
 
   const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!itemRef.current) return;
 
-    const { left, top, width, height } =
-      itemRef.current.getBoundingClientRect();
+    const { left, top, width, height } = itemRef.current.getBoundingClientRect();
 
     const relativeX = (event.clientX - left) / width;
     const relativeY = (event.clientY - top) / height;
@@ -68,7 +63,7 @@ export const BentoCard: React.FC<BentoCardProps> = ({
           observer.disconnect();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (videoRef.current?.parentElement) {
@@ -107,9 +102,7 @@ export const BentoCard: React.FC<BentoCardProps> = ({
       <div className="relative z-10 flex size-full flex-col justify-between p-5 text-blue-50">
         <div>
           <h1 className="bento-title special-font">{title}</h1>
-          {description && (
-            <p className="mt-3 max-w-64 text-xs md:text-base">{description}</p>
-          )}
+          {description && <p className="mt-3 max-w-64 text-xs md:text-base">{description}</p>}
         </div>
 
         {isComingSoon && (
@@ -150,13 +143,10 @@ const Features: React.FC = () => {
     <section className="bg-black pb-52">
       <div className="container mx-auto px-3 md:px-10">
         <div className="px-5 py-32">
-          <p className="font-circular-web text-lg text-blue-50">
-            Step Into the Quizverse
-          </p>
+          <p className="font-circular-web text-lg text-blue-50">Step Into the Quizverse</p>
           <p className="max-w-md font-circular-web text-lg text-blue-50 opacity-50">
-            Enter a dynamic world of knowledge where real-time battles, solo
-            challenges, and AI-powered quizzes blend into one seamless and
-            thrilling experience.
+            Enter a dynamic world of knowledge where real-time battles, solo challenges, and
+            AI-powered quizzes blend into one seamless and thrilling experience.
           </p>
         </div>
 
@@ -229,11 +219,7 @@ const Features: React.FC = () => {
         </div>
       </div>
 
-      <QuizPopup
-        open={isPopupOpen}
-        onClose={() => setIsPopupOpen(false)}
-        topic={selectedTopic}
-      />
+      <QuizPopup open={isPopupOpen} onClose={() => setIsPopupOpen(false)} topic={selectedTopic} />
     </section>
   );
 };

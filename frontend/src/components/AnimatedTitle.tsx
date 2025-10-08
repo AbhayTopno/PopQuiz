@@ -6,10 +6,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import clsx from 'clsx';
 import { AnimatedTitleProps } from '../types';
 
-const AnimatedTitle: React.FC<AnimatedTitleProps> = ({
-  title,
-  containerClass,
-}) => {
+const AnimatedTitle: React.FC<AnimatedTitleProps> = ({ title, containerClass }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -33,7 +30,7 @@ const AnimatedTitle: React.FC<AnimatedTitleProps> = ({
           ease: 'power2.inOut',
           stagger: 0.02,
         },
-        0
+        0,
       );
     }, containerRef);
 
@@ -43,10 +40,7 @@ const AnimatedTitle: React.FC<AnimatedTitleProps> = ({
   return (
     <div ref={containerRef} className={clsx('animated-title', containerClass)}>
       {title.split('<br />').map((line, index) => (
-        <div
-          key={index}
-          className="flex-center max-w-full flex-wrap gap-2 px-10 md:gap-3"
-        >
+        <div key={index} className="flex-center max-w-full flex-wrap gap-2 px-10 md:gap-3">
           {line.split(' ').map((word, idx) => {
             const boldMatch = word.match(/^(.*)<b>(.*)<\/b>(.*)$/);
             if (boldMatch) {
