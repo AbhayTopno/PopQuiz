@@ -1,0 +1,45 @@
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: docker/Dockerfile.dev
+    container_name: backend_dev
+    ports:
+      - '5000:5000'
+    env_file:
+      - ../backend/.env
+    volumes:
+      - ../backend:/usr/src/app:cached # Mount backend source code
+      - /usr/src/app/node_modules # Prevent overwriting node_modules
+      - /usr/src/app/dist # (optional) keep build artifacts inside container
+    environment:
+      - NODE_ENV=development
+    command: pnpm run dev # Use dev command with hot reload (e.g. nodemon / tsx watch)
+    networks:
+      - myapp-network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: docker/Dockerfile.dev
+    container_name: frontend_dev
+    ports:
+      - '3000:3000'
+    env_file:
+      - ../frontend/.env
+    volumes:
+      - ../frontend:/usr/src/app:cached # Mount frontend code for live reload
+      - /usr/src/app/node_modules
+      - /usr/src/app/.next # (optional) preserve Next.js cache
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://backend:5000 # Internal network call
+    depends_on:
+      - backend
+    command: pnpm run dev # Use Next.js dev mode
+    networks:
+      - myapp-network
+
+networks:
+  myapp-network:
+    driver: bridge

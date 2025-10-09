@@ -3,21 +3,7 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import QuizClient from './QuizClient';
 import Link from 'next/link';
-
-interface Question {
-  questionText: string;
-  options: string[];
-  correctAnswer: string;
-}
-
-interface QuizData {
-  _id: string;
-  topic: string;
-  difficulty: string;
-  numberOfQuestions: number;
-  questions: Question[];
-  hostedBy: string;
-}
+import { QuizData } from '@/types';
 
 // Force dynamic rendering (SSR) for this route
 export const dynamic = 'force-dynamic';
@@ -35,7 +21,7 @@ export default async function QuizPage({ params, searchParams }: Props) {
   // CHANGE: Await searchParams to get the resolved object, since searchParams is now a Promise (handle as optional)
   const resolvedSearchParams = await searchParams;
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL;
 
   if (!roomName) {
     return notFound();
