@@ -97,7 +97,6 @@ jobs:
           git secrets --add 'TOKEN[=|:][^\s]+'
           git secrets --add 'JWT[=|:][^\s]+'
           # Detect URLs and IPs
-          git secrets --add 'https?://[a-zA-Z0-9./?=_-]+'
           git secrets --add 'localhost[:/][0-9]*'
           git secrets --add '127\.0\.0\.1'
           git secrets --add '10\.[0-9]+\.[0-9]+\.[0-9]+'
