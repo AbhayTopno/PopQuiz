@@ -84,6 +84,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Install git-secrets
         run: |
           sudo apt-get update && sudo apt-get install -y git
@@ -101,6 +102,7 @@ jobs:
           git secrets --add '127\.0\.0\.1'
           git secrets --add '10\.[0-9]+\.[0-9]+\.[0-9]+'
           git secrets --add '192\.168\.[0-9]+\.[0-9]+'
+
       - name: Scan repository for secrets
         run: git ls-files | grep -v 'README.md' | xargs git secrets --scan
 
@@ -117,11 +119,9 @@ jobs:
           fetch-depth: 0
 
       - name: Run TruffleHog Scan
-        uses: trufflesecurity/trufflehog@v3
+        uses: trufflesecurity/trufflehog@main
         with:
-          scan: git
-          extra_args: --regex --entropy --json
-          fail: true # ❌ Fails if any secret is found
+          extra_args: --regex --entropy --json --fail
 
   # -----------------------------
   # Frontend Trivy scan
@@ -132,8 +132,12 @@ jobs:
     needs: [frontend-lint, trufflehog]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t myapp-frontend -f frontend/DockerFile ./frontend
-      - uses: aquasecurity/trivy-action@0.33.1
+
+      - name: Build frontend Docker image
+        run: docker build -t myapp-frontend -f frontend/Dockerfile ./frontend
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'image'
           image-ref: 'myapp-frontend'
@@ -151,8 +155,12 @@ jobs:
     needs: [backend-lint, trufflehog]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t myapp-backend -f backend/DockerFile ./backend
-      - uses: aquasecurity/trivy-action@0.33.1
+
+      - name: Build backend Docker image
+        run: docker build -t myapp-backend -f backend/Dockerfile ./backend
+
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'image'
           image-ref: 'myapp-backend'
@@ -178,7 +186,9 @@ jobs:
         language: [javascript, typescript]
     steps:
       - uses: actions/checkout@v4
+
       - uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
+
       - uses: github/codeql-action/analyze@v3
