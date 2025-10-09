@@ -7,7 +7,6 @@ import { Server } from 'socket.io';
 import { connectDB } from './config/db.ts';
 
 connectDB();
-const PORT = process.env.PORT;
 
 const server = http.createServer(app);
 // Attach socket.io
@@ -18,6 +17,6 @@ io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+server.listen(() => {
+  console.log(`🚀 Server running on ${process.env.SERVER_API}`);
 });
