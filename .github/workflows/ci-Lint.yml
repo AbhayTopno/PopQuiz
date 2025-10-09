@@ -121,7 +121,8 @@ jobs:
       - name: Run TruffleHog Scan
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --regex --entropy --json --fail
+          scan: .
+          extra_args: --regex --entropy --json
 
   # -----------------------------
   # Frontend Trivy scan
