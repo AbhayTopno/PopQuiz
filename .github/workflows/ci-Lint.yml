@@ -36,17 +36,6 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'frontend/pnpm-lock.yaml' # ✅ specify the lock file path
 
-      - name: Debug pnpm
-        run: |
-          echo "Node version:"
-          node -v
-          echo "npm version:"
-          npm -v
-          echo "pnpm version:"
-          pnpm -v
-          echo "pnpm path:"
-          which pnpm
-
       - run: pnpm install --frozen-lockfile || pnpm install
 
       # Run ESLint
@@ -67,26 +56,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4 # ✅ install pnpm FIRST
+      - uses: pnpm/action-setup@v4
         with:
           version: 9
 
-      - uses: actions/setup-node@v4 # ✅ then setup node with pnpm cache
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
-          cache-dependency-path: 'backend/pnpm-lock.yaml' # ✅ specify the lock file path
-
-      - name: Debug pnpm
-        run: |
-          echo "Node version:"
-          node -v
-          echo "npm version:"
-          npm -v
-          echo "pnpm version:"
-          pnpm -v
-          echo "pnpm path:"
-          which pnpm
+          cache-dependency-path: 'backend/pnpm-lock.yaml'
 
       - run: pnpm install --frozen-lockfile || pnpm install
 
@@ -97,10 +75,10 @@ jobs:
       - run: pnpm prettier --check "src/**/*.{js,ts,json,md}"
 
   # -----------------------------
-  # Detect hardcoded secrets
+  # Detect hardcoded secrets (git-secrets)
   # -----------------------------
   secret-scan:
-    name: Detect Hardcoded Secrets
+    name: Detect Hardcoded Secrets (git-secrets)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -112,13 +90,39 @@ jobs:
           git clone https://github.com/awslabs/git-secrets.git
           cd git-secrets && sudo make install
           cd ..
+          # Common secret patterns
           git secrets --add 'API[_-]?KEY[=|:][^\s]+'
           git secrets --add 'SECRET[=|:][^\s]+'
           git secrets --add 'PASSWORD[=|:][^\s]+'
           git secrets --add 'TOKEN[=|:][^\s]+'
           git secrets --add 'JWT[=|:][^\s]+'
+          # Detect URLs and IPs
+          git secrets --add 'https?://[a-zA-Z0-9./?=_-]+'
+          git secrets --add 'localhost[:/][0-9]*'
+          git secrets --add '127\.0\.0\.1'
+          git secrets --add '10\.[0-9]+\.[0-9]+\.[0-9]+'
+          git secrets --add '192\.168\.[0-9]+\.[0-9]+'
       - name: Scan repository for secrets
         run: git secrets --scan -r
+
+  # -----------------------------
+  # Deep Secret Scan (TruffleHog)
+  # -----------------------------
+  trufflehog:
+    name: Deep Secret Scan (TruffleHog)
+    runs-on: ubuntu-latest
+    needs: [secret-scan]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog Scan
+        uses: trufflesecurity/trufflehog@v3
+        with:
+          scan: git
+          extra_args: --regex --entropy --json
+          fail: true # ❌ Fails if any secret is found
 
   # -----------------------------
   # Frontend Trivy scan
@@ -126,7 +130,7 @@ jobs:
   frontend-trivy:
     name: Frontend Trivy image scan
     runs-on: ubuntu-latest
-    needs: [frontend-lint, secret-scan]
+    needs: [frontend-lint, trufflehog]
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t myapp-frontend -f frontend/DockerFile ./frontend
@@ -145,7 +149,7 @@ jobs:
   backend-trivy:
     name: Backend Trivy image scan
     runs-on: ubuntu-latest
-    needs: [backend-lint, secret-scan]
+    needs: [backend-lint, trufflehog]
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t myapp-backend -f backend/DockerFile ./backend
