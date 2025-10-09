@@ -8,8 +8,8 @@ const app = express();
 
 app.use(
   cors({
-    origin: 'http://localhost:3000', // Allow requests from this origin
-    credentials: true, // If you're using cookies or auth headers
+    origin: process.env.NEXT_API,
+    credentials: true,
   }),
 );
 
