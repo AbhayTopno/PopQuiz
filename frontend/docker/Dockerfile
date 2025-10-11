@@ -8,7 +8,10 @@ RUN apk add --no-cache git && npm install -g pnpm@latest
 WORKDIR /usr/src/app
 
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_DOCKER_BACKEND_API
+
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_DOCKER_BACKEND_API=${NEXT_PUBLIC_DOCKER_BACKEND_API}
 
 # Install deps
 COPY package.json pnpm-lock.yaml ./

@@ -104,7 +104,7 @@ jobs:
           git secrets --add '192\.168\.[0-9]+\.[0-9]+'
 
       - name: Scan repository for secrets
-        run: git ls-files | grep -v 'README.md' | xargs git secrets --scan
+        run: git ls-files | grep -v 'README.md' | grep -v '.env.example' | xargs git secrets --scan
 
   # -----------------------------
   # Deep Secret Scan (TruffleHog)

@@ -1,23 +1,30 @@
+# production.yml
 services:
-  production-backend:
-    container_name: production-backend
+  backend:
+    container_name: production_backend
     image: abhaytopno/popquiz-backend:v1.1
-    env_file: ../backend/.env
     restart: unless-stopped
-    networks:
-      - app-network
+    env_file:
+      - .env.backend
     ports:
       - '5000:5000'
-
-  production-frontend:
-    container_name: production-frontend
-    image: abhaytopno/popquiz-frontend:v1.1
-    env_file: ../frontend/.env
-    restart: unless-stopped
     networks:
-      - app-network
+      - popquiz-network
+
+  frontend:
+    container_name: production_frontend
+    image: abhaytopno/popquiz-frontend:v1.1
+    restart: unless-stopped
+    env_file:
+      - .env.frontend
+    environment:
+      - NODE_ENV=production
     ports:
       - '3000:3000'
+    depends_on:
+      - backend
+    networks:
+      - popquiz-network
 
 networks:
-  app-network:
+  popquiz-network:
