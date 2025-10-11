@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\" --max-warnings=0",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,md,css,scss}\"",
+    "check": "pnpm run lint && pnpm run format:check"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

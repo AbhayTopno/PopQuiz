@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: myapp_backend_prod
+    restart: unless-stopped
+    env_file:
+      - ../backend/.env
+    ports:
+      - '5000:5000'
+    networks:
+      - myapp-network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: docker/Dockerfile
+      target: production
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: myapp_frontend_prod
+    restart: unless-stopped
+    env_file:
+      - ../frontend/.env
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_DOCKER_BACKEND_API=http://backend:5000
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+    networks:
+      - myapp-network
+
+networks:
+  myapp-network:

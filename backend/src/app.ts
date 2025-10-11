@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import userRoutes from './routes/userRoutes.ts';
+import userRoutes from './routes/userRoutes.js';
 import cookieParser from 'cookie-parser';
 import quizRoutes from './routes/quizRoutes.js';
 
