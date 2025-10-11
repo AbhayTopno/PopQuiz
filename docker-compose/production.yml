@@ -1,37 +1,30 @@
+# production.yml
 services:
   backend:
-    build:
-      context: ../backend
-      dockerfile: docker/Dockerfile
-      target: production
-    container_name: myapp_backend_prod
+    container_name: production_backend
+    image: abhaytopno/popquiz-backend:v1.1
     restart: unless-stopped
     env_file:
-      - ../backend/.env
+      - .env.backend
     ports:
       - '5000:5000'
     networks:
-      - myapp-network
+      - popquiz-network
 
   frontend:
-    build:
-      context: ../frontend
-      dockerfile: docker/Dockerfile
-      target: production
-    container_name: myapp_frontend_prod
+    container_name: production_frontend
+    image: abhaytopno/popquiz-frontend:v1.1
     restart: unless-stopped
     env_file:
-      - ../frontend/.env
+      - .env.frontend
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://backend:5000
     ports:
       - '3000:3000'
     depends_on:
       - backend
     networks:
-      - myapp-network
+      - popquiz-network
 
 networks:
-  myapp-network:
-    driver: bridge
+  popquiz-network:

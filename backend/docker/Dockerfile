@@ -1,32 +1,33 @@
-# backend/Dockerfile (production)
-FROM node:22-alpine AS base
-RUN apk add --no-cache bash git && npm install -g pnpm@latest
+# Dockerfile
+
+# -------------------------
+# Backend Production Build
+# -------------------------
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat && npm install -g pnpm@latest
 WORKDIR /usr/src/app
 
-# Install deps
-FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# Build (if you have a build step, otherwise this just copies source)
-FROM deps AS builder
 COPY . .
-# If TS/compilation exists, build it. If not, this step is harmless.
-RUN pnpm run build || true
+# This will now correctly generate the /dist folder
+RUN pnpm run build
 
-# Production runtime image: install production deps
+# -------------------------
+# Production Runtime
+# -------------------------
 FROM node:22-alpine AS production
-RUN apk add --no-cache bash
 WORKDIR /usr/src/app
-COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm@latest && pnpm install --frozen-lockfile --prod
-
-# Copy built output (prefer dist) or source
-COPY --from=builder /usr/src/app ./
+RUN apk add --no-cache ca-certificates
 
 ENV NODE_ENV=production
-EXPOSE 5000
 
-# Use your production start command. Adjust if your start script differs.
-# Common: "node dist/index.js" for compiled code, or "pnpm start" if defined.
-CMD ["pnpm", "run", "start"]
+# Only copy necessary production files
+COPY --from=builder /usr/src/app/package.json ./package.json
+COPY --from=builder /usr/src/app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder /usr/src/app/dist ./dist
+
+EXPOSE 5000
+CMD ["node", "dist/index.js"]

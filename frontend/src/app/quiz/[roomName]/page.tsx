@@ -21,7 +21,7 @@ export default async function QuizPage({ params, searchParams }: Props) {
   // CHANGE: Await searchParams to get the resolved object, since searchParams is now a Promise (handle as optional)
   const resolvedSearchParams = await searchParams;
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL;
+  const apiBase = process.env.NEXT_PUBLIC_DOCKER_BACKEND_API;
 
   if (!roomName) {
     return notFound();

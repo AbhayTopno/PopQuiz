@@ -5,7 +5,7 @@ import {
   deleteQuiz,
   getQuizById,
   updateQuiz,
-} from '../controllers/quiz.controller.ts';
+} from '../controllers/quiz.controller.js';
 
 const router = express.Router();
 

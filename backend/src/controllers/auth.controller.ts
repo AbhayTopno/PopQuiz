@@ -1,7 +1,7 @@
-import { asyncHandler } from '../middlewares/asyncHandler.ts';
-import { User } from '../models/user.ts';
+import { asyncHandler } from '../middlewares/asyncHandler.js';
+import { User } from '../models/user.js';
 import bcrypt from 'bcryptjs';
-import generateToken from '../utils/createToken.ts';
+import generateToken from '../utils/createToken.js';
 import type { Request, Response } from 'express';
 
 const signup = asyncHandler(async (req: Request, res: Response) => {
