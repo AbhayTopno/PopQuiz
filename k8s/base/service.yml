@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-backend-service
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-frontend-service
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP

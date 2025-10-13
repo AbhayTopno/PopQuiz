@@ -1,0 +1,66 @@
+# deployment-green.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: popquiz-backend-deployment-green
+  namespace: popquiz
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: popquiz-backend
+      version: green
+  template:
+    metadata:
+      labels:
+        app: popquiz-backend
+        version: green
+    spec:
+      containers:
+        - name: popquiz-backend
+          image: abhaytopno/popquiz-backend-test # Current image version
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: backend-secrets
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: popquiz-frontend-deployment-green
+  namespace: popquiz
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: popquiz-frontend
+      version: green
+  template:
+    metadata:
+      labels:
+        app: popquiz-frontend
+        version: green
+    spec:
+      containers:
+        - name: popquiz-frontend
+          image: abhaytopno/popquiz-frontend-test # Current image version
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: frontend-config
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'

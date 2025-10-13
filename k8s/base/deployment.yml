@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: popquiz-backend-deployment
+  namespace: popquiz
+  labels:
+    app: popquiz-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: popquiz-backend
+  template:
+    metadata:
+      labels:
+        app: popquiz-backend
+    spec:
+      containers:
+        - name: popquiz-backend
+          image: abhaytopno/popquiz-backend:v1.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: backend-secrets
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: popquiz-frontend-deployment
+  namespace: popquiz
+  labels:
+    app: popquiz-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: popquiz-frontend
+  template:
+    metadata:
+      labels:
+        app: popquiz-frontend
+    spec:
+      containers:
+        - name: popquiz-frontend
+          image: abhaytopno/popquiz-frontend:v1.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: frontend-config
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'

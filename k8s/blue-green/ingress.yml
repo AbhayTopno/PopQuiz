@@ -1,0 +1,25 @@
+# ingress.yml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: popquiz-ingress
+  namespace: popquiz
+spec:
+  rules:
+    - host: popquiz.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: popquiz-frontend-service-blue
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: popquiz-backend-service-blue
+                port:
+                  number: 80

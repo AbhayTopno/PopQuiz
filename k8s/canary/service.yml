@@ -1,0 +1,54 @@
+# service.yml
+# --- Stable Services ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-frontend-service-stable
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-frontend
+    version: stable
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-backend-service-stable
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-backend
+    version: stable
+  ports:
+    - port: 80
+      targetPort: 5000
+# --- Canary Services ---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-frontend-service-canary
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-frontend-canary
+    version: canary
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-backend-service-canary
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-backend-canary
+    version: canary
+  ports:
+    - port: 80
+      targetPort: 5000
