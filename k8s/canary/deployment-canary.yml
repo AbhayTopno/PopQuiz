@@ -1,0 +1,44 @@
+# deployment-canary.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: popquiz-backend-deployment-canary
+  namespace: popquiz
+spec:
+  replicas: 1 # Start with fewer replicas for the canary
+  selector:
+    matchLabels:
+      app: popquiz-backend-canary
+  template:
+    metadata:
+      labels:
+        app: popquiz-backend-canary
+        version: canary # Label for the canary service
+    spec:
+      containers:
+        - name: popquiz-backend
+          image: abhaytopno/popquiz-backend-test # <-- NEW IMAGE VERSION
+          ports:
+            - containerPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: popquiz-frontend-deployment-canary
+  namespace: popquiz
+spec:
+  replicas: 1 # Start with fewer replicas for the canary
+  selector:
+    matchLabels:
+      app: popquiz-frontend-canary
+  template:
+    metadata:
+      labels:
+        app: popquiz-frontend-canary
+        version: canary # Label for the canary service
+    spec:
+      containers:
+        - name: popquiz-frontend
+          image: abhaytopno/popquiz-frontend-test # <-- NEW IMAGE VERSION
+          ports:
+            - containerPort: 3000

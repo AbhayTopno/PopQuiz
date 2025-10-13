@@ -1,0 +1,28 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: popquiz-frontend-vpa
+  namespace: popquiz
+spec:
+  targetRef:
+    apiVersion: 'apps/v1'
+    kind: Deployment
+    name: popquiz-frontend-deployment
+
+  updatePolicy:
+    updateMode: 'Auto'
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: popquiz-backend-vpa
+  namespace: popquiz
+spec:
+  targetRef:
+    apiVersion: 'apps/v1'
+    kind: Deployment
+    name: popquiz-backend-deployment
+
+  updatePolicy:
+    updateMode: 'Auto'

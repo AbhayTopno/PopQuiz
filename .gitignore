@@ -90,3 +90,5 @@ lib/
 
 # Optional: macOS-specific
 .DS_Store
+
+minikube*

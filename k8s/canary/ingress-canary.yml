@@ -1,0 +1,23 @@
+# ingress-canary.yml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: popquiz-ingress-canary
+  namespace: popquiz
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # --- Canary Annotations ---
+    nginx.ingress.kubernetes.io/canary: 'true'
+    nginx.ingress.kubernetes.io/canary-weight: '10' # Start with 10% of traffic
+spec:
+  rules:
+    - host: popquiz.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: popquiz-frontend-service-canary
+                port:
+                  number: 80
