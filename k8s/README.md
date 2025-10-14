@@ -15,6 +15,7 @@ This project provides hands-on examples for the following deployment strategies:
 - **Autoscaling**: Automatically scale your application based on resource utilization.
 - **Blue-Green Deployment**: Achieve zero-downtime releases by switching traffic between two identical environments.
 - **Canary Deployment**: Gradually roll out new versions to a small subset of users to minimize risk.
+- **Monitoring**: Set up a complete monitoring stack using Prometheus and Grafana.
 
 ---
 
@@ -26,6 +27,7 @@ Before you begin, ensure you have the following tools installed and configured:
 - **A Kubernetes Cluster**: A running cluster, such as [Minikube](https://minikube.sigs.k8s.io/docs/start/), [Docker Desktop](https://www.docker.com/products/docker-desktop/), or a cloud-based cluster (GKE, EKS, AKS).
 - **An Ingress Controller**: Required for Blue-Green and Canary strategies. If you don't have one, we recommend the [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/deploy/).
 - **Git**: For cloning the repository.
+- **Helm**: The package manager for Kubernetes, used to install the monitoring stack.
 
 ---
 
@@ -36,7 +38,7 @@ Follow these initial setup steps before trying any of the deployment strategies.
 1.  **Clone the Repository**
 
     ```bash
-    git clone https://github.com/your-username/popquiz.git
+    git clone [https://github.com/your-username/popquiz.git](https://github.com/your-username/popquiz.git)
     cd my-k8s-project
     ```
 
@@ -170,6 +172,54 @@ Gradually shift a percentage of traffic to a new version to test it in productio
 
 ---
 
+## 📊 Monitoring with Prometheus and Grafana
+
+Set up a robust monitoring stack to visualize metrics from your cluster and applications. We'll use the `kube-prometheus-stack` Helm chart, which provides a comprehensive, pre-configured setup.
+
+1.  **Add the Prometheus Community Helm repository:**
+    This command adds the repository that contains the chart we need.
+
+    ```bash
+    helm repo add prometheus-community [https://prometheus-community.github.io/helm-charts](https://prometheus-community.github.io/helm-charts)
+    helm repo update
+    ```
+
+2.  **Create a Monitoring Namespace:**
+    It's best practice to install monitoring tools in their own dedicated namespace.
+
+    ```bash
+    kubectl create namespace monitoring
+    ```
+
+3.  **Install the kube-prometheus-stack:**
+    This Helm command deploys Prometheus, Grafana, Alertmanager, and various exporters to collect metrics from your cluster's nodes and services.
+
+    ```bash
+    helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring
+    ```
+
+4.  **Verify the Installation:**
+    Check that all the pods for the monitoring stack are running correctly. You should see pods for Prometheus, Grafana, node-exporter, and others.
+
+    ```bash
+    kubectl get pods -n monitoring
+    ```
+
+5.  **Access the Grafana Dashboard:**
+    Use `port-forward` to access the Grafana UI from your local machine.
+    ```bash
+    kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
+    ```
+    - Open your browser and go to `http://localhost:3000`.
+    - The default username is `admin`.
+    - To get the default password, run this command:
+      ```bash
+      kubectl get secret --namespace monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+      ```
+    - Once logged in, you can explore the pre-built dashboards for Kubernetes monitoring!
+
+---
+
 ## 🛠️ Useful `kubectl` Commands
 
 Here are some helpful commands for debugging and managing your deployments.
@@ -196,7 +246,7 @@ To test the API communication between the frontend and backend pods directly.
     ```
 2.  **Exec into the frontend pod:** (Replace `<pod-hash>` with the unique ID from the previous command)
     ```bash
-    kubectl exec -it -n popquiz popquiz-frontend-deployment-blue-<pod-hash> -- sh
+    kubectl exec -it -n popquiz popquiz-frontend-deployment-<pod-hash> -- sh
     ```
 3.  **Inside the pod's shell, install `curl` and test the backend:**
 
@@ -206,12 +256,12 @@ To test the API communication between the frontend and backend pods directly.
 
     # Generate a new quiz
     curl -X POST \
-     -H "Content-Type: application/json" \
-     -d '{"topic": "Hyper Cars", "difficulty": "medium", "count": 1}' \
-     http://popquiz-backend-service-blue/api/quiz/generate
+      -H "Content-Type: application/json" \
+      -d '{"topic": "Hyper Cars", "difficulty": "medium", "count": 1}' \
+      http://popquiz-backend-service/api/quiz/generate
 
     # Fetch a quiz by its room name
-    curl http://popquiz-backend-service-blue/api/quiz/your-room-name-here
+    curl http://popquiz-backend-service/api/quiz/your-room-name-here
     ```
 
 ### Generating Load for HPA Testing
@@ -238,8 +288,9 @@ To test the Horizontal Pod Autoscaler, you need to generate CPU load.
 
 4.  **Inside the pod's shell, run this infinite loop:**
     ```bash
+    apk add curl
     # This loop continuously sends requests to the frontend service, generating load.
-    while true; do curl -s http://popquiz-frontend-service-blue > /dev/null; done
+    while true; do curl -s http://popquiz-frontend-service > /dev/null; done
     ```
 5.  **Observe the terminals from Step 1.** You will see the CPU utilization climb in the HPA status, and after it crosses the target threshold, Kubernetes will start creating new pods.
 

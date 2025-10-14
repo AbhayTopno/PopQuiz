@@ -1,0 +1,32 @@
+namespace: popquiz
+
+backend:
+  name: popquiz-backend
+  image: abhaytopno/popquiz-backend:v1.1
+  port: 5000
+  resources:
+    requests:
+      cpu: '100m'
+      memory: '128Mi'
+    limits:
+      cpu: '500m'
+      memory: '512Mi'
+  secretName: backend-secrets
+
+frontend:
+  name: popquiz-frontend
+  image: abhaytopno/popquiz-frontend:v1.1
+  port: 3000
+  resources:
+    requests:
+      cpu: '100m'
+      memory: '128Mi'
+    limits:
+      cpu: '500m'
+      memory: '512Mi'
+  configMapName: frontend-config
+
+ingress:
+  host: popquiz.local
+  tlsSecret: popquiz.local-tls
+  className: nginx
