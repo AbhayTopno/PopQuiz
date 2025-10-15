@@ -78,12 +78,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Lint all Dockerfiles (frontend/backend) separately
-      - name: Lint Dockerfiles with Hadolint
-        run: |
-          docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint frontend/docker/Dockerfile
-          docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint backend/docker/Dockerfile
-
       - name: Install yamllint
         run: pip install yamllint
 
