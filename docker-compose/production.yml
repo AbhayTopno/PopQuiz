@@ -5,7 +5,7 @@ services:
     image: abhaytopno/popquiz-backend:v1.1
     restart: unless-stopped
     env_file:
-      - .env.backend
+      - ../backend/.env
     ports:
       - '5000:5000'
     networks:
@@ -16,7 +16,7 @@ services:
     image: abhaytopno/popquiz-frontend:v1.1
     restart: unless-stopped
     env_file:
-      - .env.frontend
+      - ../frontend/.env
     environment:
       - NODE_ENV=production
     ports:
