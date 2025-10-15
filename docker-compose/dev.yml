@@ -1,3 +1,4 @@
+---
 services:
   backend:
     build:
@@ -14,7 +15,7 @@ services:
       - /usr/src/app/dist # (optional) keep build artifacts inside container
     environment:
       - NODE_ENV=development
-    command: pnpm run dev # Use dev command with hot reload (e.g. nodemon / tsx watch)
+    command: pnpm run dev
     networks:
       - myapp-network
 
@@ -29,11 +30,11 @@ services:
       - ../frontend/.env
     volumes:
       - ../frontend:/usr/src/app:cached # Mount frontend code for live reload
-      - /usr/src/app/node_modules
+      - /usr/src/app/node_modules # Prevent overwriting node_modules
       - /usr/src/app/.next # (optional) preserve Next.js cache
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_DOCKER_BACKEND_API=http://backend:5000 # Internal network call
+      - NEXT_PUBLIC_DOCKER_BACKEND_API=http://backend:5000
     depends_on:
       - backend
     command: pnpm run dev # Use Next.js dev mode
