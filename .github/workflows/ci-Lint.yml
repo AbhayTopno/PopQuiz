@@ -78,11 +78,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Lint all Dockerfiles (frontend/backend) separately and ignore version pinning rule DL3018
+      - name: Lint Dockerfiles with Hadolint
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 frontend/docker/Dockerfile
+          docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 backend/docker/Dockerfile
+
       - name: Install yamllint
         run: pip install yamllint
 
       - name: Lint Docker Compose YAML files
         run: yamllint docker-compose/
+
+      # ✅ Use .env.example files for validation step
+      - name: Create .env files from examples
+        run: |
+          cp frontend/.env.example frontend/.env
+          cp backend/.env.example backend/.env
+          cp frontend/.env.example docker-compose/.env.frontend
+          cp backend/.env.example docker-compose/.env.backend
 
       - name: Validate Docker Compose configurations
         run: |
@@ -179,7 +193,7 @@ jobs:
   # -----------------------------
   # Frontend Trivy scan
   # -----------------------------
-  frontend-trivy:
+  frontend-trufflehog:
     name: Frontend Trivy image scan
     runs-on: ubuntu-latest
     needs: [frontend-lint, trufflehog]
@@ -202,7 +216,7 @@ jobs:
   # -----------------------------
   # Backend Trivy scan
   # -----------------------------
-  backend-trivy:
+  backend-trufflehog:
     name: Backend Trivy image scan
     runs-on: ubuntu-latest
     needs: [backend-lint, trufflehog]
@@ -228,7 +242,7 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
-    needs: [frontend-trivy, backend-trivy, k8s-validate]
+    needs: [frontend-trufflehog, backend-trufflehog, k8s-validate]
     permissions:
       actions: read
       contents: read
