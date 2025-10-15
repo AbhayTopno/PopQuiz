@@ -66,6 +66,34 @@ Follow these initial setup steps before trying any of the deployment strategies.
 
 Choose a strategy below and follow the instructions.
 
+### Helm Chart Deployment 🚢
+
+Package and deploy the application using the provided Helm chart for better versioning and release management.
+
+1.  **Navigate to the Helm directory:**
+
+    ```bash
+    cd k8s/helm
+    ```
+
+2.  **Package the chart:**
+
+    This command bundles your chart into a versioned archive file (`.tgz`).
+
+    ```bash
+    helm package popquiz-chart
+    ```
+
+    This will create a file named something like `popquiz-chart-0.1.0.tgz`.
+
+3.  **Install the chart:**
+
+    Deploy the packaged chart into your Kubernetes cluster.
+
+    ```bash
+    helm install popquiz-release ./popquiz-chart-0.1.0.tgz --namespace popquiz --create-namespace
+    ```
+
 ### Base Deployment
 
 This is the most basic way to run the application with a single Deployment and Service.
