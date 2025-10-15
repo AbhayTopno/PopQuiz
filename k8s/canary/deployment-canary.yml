@@ -20,6 +20,20 @@ spec:
           image: abhaytopno/popquiz-backend-test # <-- NEW IMAGE VERSION
           ports:
             - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: backend-secrets
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -42,3 +56,17 @@ spec:
           image: abhaytopno/popquiz-frontend-test # <-- NEW IMAGE VERSION
           ports:
             - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: frontend-config
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '128Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
