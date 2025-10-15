@@ -1,3 +1,4 @@
+---
 services:
   backend:
     build:
@@ -7,7 +8,7 @@ services:
     container_name: myapp_backend_prod
     restart: unless-stopped
     env_file:
-      - .env.backend
+      - ../backend/.env
     ports:
       - '5000:5000'
     networks:
@@ -24,7 +25,7 @@ services:
     container_name: myapp_frontend_prod
     restart: unless-stopped
     env_file:
-      - .env.frontend
+      - ../frontend/.env
     environment:
       - NODE_ENV=production
     ports:
