@@ -1,9 +1,11 @@
 import { Server as HTTPServer } from 'http';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import type { Server as SocketIOServer } from 'socket.io';
 import { ChatMessage, Player, ScoreUpdate } from '../types/index.js';
 import type { AnswerSubmission } from '../types/index.js';
 import * as redisService from './redisService.js';
+import { socketAuthMiddleware } from '../middlewares/socketAuthMiddleware.js';
+import type { AuthSocket } from '../middlewares/socketAuthMiddleware.js';
 
 export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
   const io = new Server(httpServer, {
@@ -15,15 +17,25 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     pingInterval: 25000,
   });
 
-  io.on('connection', (socket: Socket) => {
+  // Attach authentication middleware so we can identify users by JWT cookie
+  io.use((socket, next) => socketAuthMiddleware(socket as unknown as AuthSocket, next));
+
+  io.on('connection', (socket: AuthSocket) => {
     console.log(`🔌 Client connected: ${socket.id}`);
 
     // Join a quiz room
     socket.on(
       'join-room',
-      async (data: { roomId: string; quizId: string; username: string; avatar?: string }) => {
+      async (data: { roomId: string; quizId: string; username?: string; avatar?: string }) => {
         try {
-          const { roomId, quizId, username, avatar } = data;
+          const { roomId, quizId } = data;
+          const payloadUsername = (data.username ?? '').trim();
+          const payloadAvatar = data.avatar;
+
+          // Prefer authenticated user details when available
+          const effectiveUsername =
+            (socket.user?.username || payloadUsername || 'Player').trim() || 'Player';
+          const effectiveAvatar = socket.user?.profilePic ?? payloadAvatar;
 
           // Create room if it doesn't exist
           const roomExists = await redisService.roomExists(roomId);
@@ -38,8 +50,8 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           // Add player to room
           const player: Player = {
             id: socket.id,
-            username,
-            avatar,
+            username: effectiveUsername,
+            avatar: effectiveAvatar,
             score: 0,
             currentQuestionIndex: 0,
             answers: [],
@@ -89,13 +101,13 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           const systemMessage: ChatMessage = {
             id: `${Date.now()}-${Math.random()}`,
             username: 'System',
-            message: `${username} joined the room`,
+            message: `${effectiveUsername} joined the room`,
             timestamp: Date.now(),
           };
           await redisService.addChatMessage(roomId, systemMessage);
           io.to(roomId).emit('chat-message', systemMessage);
 
-          console.log(`👤 ${username} joined room ${roomId}`);
+          console.log(`👤 ${effectiveUsername} joined room ${roomId}`);
         } catch (error) {
           console.error('Error in join-room:', error);
           socket.emit('error', { message: 'Failed to join room' });

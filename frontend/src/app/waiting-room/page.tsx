@@ -1,15 +1,24 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import WaitingRoom from '@/app/waiting-room/WaitingRoom';
+import { useAuth } from '@/contexts/AuthContext';
 
 function WaitingRoomContent() {
   const searchParams = useSearchParams();
+  const { user, currentUser } = useAuth();
   const roomId = searchParams.get('roomId') || '';
   const quizId = searchParams.get('quizId') || '';
-  const username = searchParams.get('username') || 'Guest';
-  const avatar = searchParams.get('avatar') || undefined;
+  const urlUsername = searchParams.get('username') || 'Guest';
+  const urlAvatar = searchParams.get('avatar') || undefined;
+  // Refresh and prefer authenticated user for accurate username/avatar
+  useEffect(() => {
+    currentUser().catch(() => {});
+  }, [currentUser]);
+
+  const resolvedUsername = user?.username ?? urlUsername;
+  const resolvedAvatar = user?.avatar ?? urlAvatar;
   const isHost = searchParams.get('host') === '1';
   const mode = searchParams.get('mode') || '1v1';
 
@@ -41,8 +50,8 @@ function WaitingRoomContent() {
     <WaitingRoom
       roomId={roomId}
       quizId={quizId}
-      username={username}
-      avatar={avatar}
+      username={resolvedUsername}
+      avatar={resolvedAvatar}
       isHost={isHost}
       mode={mode}
       initialSettings={initialSettings}

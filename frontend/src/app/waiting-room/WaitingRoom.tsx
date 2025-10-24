@@ -42,10 +42,29 @@ interface Settings {
 
 const difficulties = ['easy', 'medium', 'hard'];
 
+// Types for server-emitted payloads to avoid `any`
+interface ServerPlayer {
+  id: string;
+  username?: string;
+  name?: string;
+  avatar?: string;
+}
+
+interface ServerChatMessage {
+  id: string;
+  username?: string;
+  name?: string;
+  message?: string;
+  text?: string;
+  timestamp?: number;
+  ts?: number;
+}
+
 const WaitingRoom: React.FC<WaitingRoomProps> = ({
   roomId,
   quizId,
   username,
+  avatar,
   isHost,
   mode,
   initialSettings,
@@ -62,6 +81,11 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
   const [countdown, setCountdown] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Refs for slide-in settings drawer (mobile)
+  const settingsOverlayRef = useRef<HTMLDivElement | null>(null);
+  const settingsPanelRef = useRef<HTMLDivElement | null>(null);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const messageEndRef = useRef<HTMLDivElement>(null);
@@ -77,7 +101,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
         roomId,
         quizId,
         username: username && username.trim(),
-        avatar: '',
+        avatar: avatar ?? '',
       };
 
       // Backend uses 'join-room' for both creating and joining
@@ -119,8 +143,21 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     const handleSettingsUpdate = (s: Settings) => setSettings(s);
     const handleSettingsCurrent = (s: Settings) => setSettings(s);
     const handleChat = (payload: ChatMessage) => setMessages((m) => [...m, payload]);
-    const handleChatHistory = (history: ChatMessage[]) =>
-      setMessages((m) => (m.length ? m : history));
+    const handleChatHistory = (history: ServerChatMessage[]) =>
+      setMessages((m) =>
+        m.length
+          ? m
+          : history.map(
+              (msg) =>
+                ({
+                  id: msg.id,
+                  name: msg.username ?? msg.name ?? 'Player',
+                  text: msg.message ?? msg.text ?? '',
+                  ts: msg.timestamp ?? msg.ts ?? Date.now(),
+                  system: (msg.username ?? msg.name) === 'System',
+                }) as ChatMessage,
+            ),
+      );
     const handleQuizStart = (payload: { quizId: string; duration: number }) => {
       if (mode === '1v1') {
         router.push(
@@ -137,17 +174,26 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
 
     // Map old events to new ones
     socket.on('room:users', handleUsers);
-    socket.on('room-state', (data: { players?: Player[]; messages?: ChatMessage[] }) => {
-      if (data.players) setPlayers(data.players);
-      if (data.messages) handleChatHistory(data.messages);
-    });
-    socket.on('player-joined', (data: { player: { id: string; username: string } }) => {
-      setPlayers((prev) => {
-        const exists = prev.find((p) => p.id === data.player.id);
-        if (exists) return prev;
-        return [...prev, { id: data.player.id, name: data.player.username }];
-      });
-    });
+    socket.on(
+      'room-state',
+      (data: { players?: ServerPlayer[]; messages?: ServerChatMessage[] }) => {
+        if (data.players)
+          setPlayers(
+            data.players.map((p) => ({ id: p.id, name: p.username ?? p.name ?? 'Player' })),
+          );
+        if (data.messages) handleChatHistory(data.messages);
+      },
+    );
+    socket.on(
+      'player-joined',
+      (data: { player: { id: string; username?: string; avatar?: string } }) => {
+        setPlayers((prev) => {
+          const exists = prev.find((p) => p.id === data.player.id);
+          if (exists) return prev;
+          return [...prev, { id: data.player.id, name: data.player.username ?? 'Player' }];
+        });
+      },
+    );
     socket.on('player-left', (data: { playerId: string }) => {
       setPlayers((prev) => prev.filter((p) => p.id !== data.playerId));
     });
@@ -155,13 +201,19 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     socket.on('settings:current', handleSettingsCurrent);
     socket.on(
       'chat-message',
-      (msg: { id: string; username: string; message: string; timestamp: number }) => {
+      (msg: {
+        id: string;
+        username?: string;
+        message?: string;
+        timestamp?: number;
+        avatar?: string;
+      }) => {
         handleChat({
           id: msg.id,
-          name: msg.username,
-          text: msg.message,
-          ts: msg.timestamp,
-          system: msg.username === 'System',
+          name: msg.username ?? 'Player',
+          text: msg.message ?? '',
+          ts: msg.timestamp ?? Date.now(),
+          system: (msg.username ?? '') === 'System',
         });
       },
     );
@@ -201,6 +253,41 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       ease: 'power2.out',
     });
   }, []);
+
+  // Animate settings drawer open/close (mobile)
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+    // open
+    gsap.fromTo(
+      settingsOverlayRef.current,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.3, ease: 'power2.out' },
+    );
+    gsap.fromTo(
+      settingsPanelRef.current,
+      { x: 320, opacity: 0 },
+      { x: 0, opacity: 1, duration: 0.35, ease: 'power2.out' },
+    );
+  }, [isSettingsOpen]);
+
+  const closeSettings = () => {
+    if (settingsOverlayRef.current && settingsPanelRef.current) {
+      gsap.to(settingsPanelRef.current, {
+        x: 320,
+        opacity: 0,
+        duration: 0.3,
+        ease: 'power2.in',
+      });
+      gsap.to(settingsOverlayRef.current, {
+        opacity: 0,
+        duration: 0.3,
+        ease: 'power2.in',
+        onComplete: () => setIsSettingsOpen(false),
+      });
+    } else {
+      setIsSettingsOpen(false);
+    }
+  };
 
   const updateSettings = (partial: Partial<Settings>) => {
     setSettings((prev) => {
@@ -280,18 +367,26 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
         <h1 className="font-zentry text-2xl md:text-3xl font-black uppercase">
           {mode === '1v1' ? '1v1 Waiting Room' : 'Co-op Waiting Room'}
         </h1>
-        <button
-          onClick={handleLeaveRoom}
-          className="rounded-lg bg-red-500/20 px-4 py-2 font-general text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/30"
-        >
-          Leave Room
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="md:hidden rounded-lg bg-white/10 px-4 py-2 font-general text-sm font-semibold text-white transition-colors hover:bg-white/20"
+          >
+            Settings
+          </button>
+          <button
+            onClick={handleLeaveRoom}
+            className="rounded-lg bg-red-500/20 px-4 py-2 font-general text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/30"
+          >
+            Leave Room
+          </button>
+        </div>
       </div>
 
       {/* Main Content - 50% Chat / 50% Settings */}
-      <div className="flex flex-1 flex-col lg:flex-row gap-4 lg:gap-6 overflow-hidden">
+      <div className="flex flex-1 flex-col md:flex-row gap-4 md:gap-6 overflow-hidden">
         {/* Chat Section - 50% on desktop */}
-        <div className="order-2 lg:order-1 w-full lg:w-1/2 flex flex-col min-h-0">
+        <div className="order-2 md:order-1 w-full md:w-1/2 flex flex-col min-h-0">
           <div className="rounded-2xl border border-white/20 bg-white/5 p-4 backdrop-blur flex flex-col h-full min-h-0">
             <div className="mb-3 text-sm font-semibold uppercase text-white/80">
               Players {mode === '1v1' ? '(2 max)' : ''}
@@ -301,11 +396,12 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 <span
                   key={p.id}
                   className={`rounded px-2 py-1 text-xs flex items-center gap-1 ${
-                    i === 0 ? 'bg-purple-500/50 text-purple-300' : 'bg-white/10'
+                    i === 0
+                      ? 'border-2 border-purple-500/50 bg-purple-500/10 text-purple-300'
+                      : 'bg-white/10'
                   }`}
                 >
                   {p.name}
-                  {i === 0 && <span title="Host">👑</span>}
                 </span>
               ))}
               {players.length === 0 && (
@@ -320,33 +416,44 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
             <div className="flex-1 overflow-hidden mb-2">
               <div
                 ref={chatContainerRef}
-                className="h-full overflow-auto rounded border border-white/10 bg-black/30 p-2 text-xs"
+                className="h-full overflow-auto rounded-lg border border-white/10 bg-black/30 p-2 text-xs"
               >
                 {messages.length === 0 && <div className="text-white/60">No messages yet.</div>}
-                {messages.map((msg) => (
-                  <div key={msg.id} className="mb-2">
-                    {msg.system ? (
-                      <div className="text-center text-white/50 italic py-1">{msg.text}</div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-white/90 text-[10px]">
-                            {initial(msg.name)}
+                {messages.map((msg, idx) => {
+                  const showHeader =
+                    msg.system ||
+                    idx === 0 ||
+                    messages[idx - 1].system ||
+                    messages[idx - 1].name !== msg.name;
+                  return (
+                    <div key={`${msg.id}-${msg.ts}`} className={showHeader ? 'mb-2' : 'mb-1 pl-7'}>
+                      {msg.system ? (
+                        <div className="text-center text-white/50 italic py-1">{msg.text}</div>
+                      ) : (
+                        <>
+                          {showHeader && (
+                            <div className="flex items-center gap-2 mb-1 p-2">
+                              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-white/90 text-[10px]">
+                                {initial(msg.name)}
+                              </div>
+                              <span className="text-white/70 text-[11px]">{msg.name}</span>
+                            </div>
+                          )}
+                          <div className={!showHeader ? 'text-white/90' : 'pl-7 text-white/90'}>
+                            {msg.text}
                           </div>
-                          <span className="text-white/70 text-[11px]">{msg.name}</span>
-                        </div>
-                        <div className="pl-7 text-white/90">{msg.text}</div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
                 <div ref={messageEndRef} />
               </div>
             </div>
 
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <input
-                className="flex-1 rounded bg-white/10 px-3 py-2 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 rounded-lg border border-white/20 bg-black/10 shadow-2xl px-3 py-2 font-mono text-sm truncate"
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 placeholder="Type a message…"
@@ -354,7 +461,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
               />
               <button
                 disabled={!connected}
-                className="rounded bg-blue-500 px-4 py-2 text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                className="rounded-lg bg-blue-500 px-4 py-2 text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors"
               >
                 Send
               </button>
@@ -365,15 +472,15 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
           </div>
         </div>
 
-        {/* Settings Section - 50% on desktop */}
-        <div className="order-1 lg:order-2 w-full lg:w-1/2 flex flex-col min-h-0">
+        {/* Settings Section - 50% on desktop (hidden on small screens) */}
+        <div className="order-1 md:order-2 w-full md:w-1/2 flex-col min-h-0 hidden md:flex">
           <div className="rounded-2xl border border-white/20 bg-white/5 p-5 backdrop-blur flex flex-col h-full min-h-0">
             <h2 className="mb-4 text-lg font-semibold">Settings</h2>
             <div className="space-y-4 flex-1 overflow-y-auto pr-2">
               <div>
                 <label className="mb-1 block text-sm text-white/80">Room ID</label>
                 <div className="flex gap-2">
-                  <div className="flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 font-mono text-sm truncate">
+                  <div className="flex-1 rounded-lg border border-white/20 bg-black/10 shadow-2xl px-3 py-2 font-mono text-sm truncate">
                     {roomId}
                   </div>
                   <button
@@ -390,9 +497,135 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
               </div>
 
               <div>
-                <label className="mb-1 block text-sm text-white/80">Username</label>
-                <div className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm">
-                  {username}
+                <label className="mb-1 block text-sm text-white/80">Quiz Topic</label>
+                <input
+                  className="w-full rounded-lg border border-white/20 bg-black/10 shadow-2xl px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  value={settings.topic}
+                  onChange={(e) => updateSettings({ topic: e.target.value })}
+                  disabled={!isHost}
+                  placeholder="Enter topic..."
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm text-white/80">Difficulty</label>
+                <div className="flex gap-2">
+                  {difficulties.map((d) => (
+                    <button
+                      key={d}
+                      disabled={!isHost}
+                      onClick={() => updateSettings({ difficulty: d })}
+                      className={`px-3 py-2 rounded-lg text-sm capitalize transition-colors ${
+                        settings.difficulty === d
+                          ? 'bg-blue-500'
+                          : 'bg-white/10 shadow-2xl hover:bg-white/20 disabled:opacity-50'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm text-white/80">Questions</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    className="w-full rounded-lg border border-white/20 bg-black/10 shadow-2xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    value={settings.count}
+                    onChange={(e) =>
+                      updateSettings({
+                        count: Math.min(50, Math.max(1, Number(e.target.value || 1))),
+                      })
+                    }
+                    disabled={!isHost}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-white/80">Duration (sec)</label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={300}
+                    className="w-full rounded-lg border border-white/20 bg-black/10 shadow-2xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    value={settings.duration}
+                    onChange={(e) =>
+                      updateSettings({
+                        duration: Math.min(300, Math.max(5, Number(e.target.value || 10))),
+                      })
+                    }
+                    disabled={!isHost}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Let's Go button at the bottom */}
+            {isHost && (
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <button
+                  onClick={handleLetsGo}
+                  disabled={
+                    isGenerating || !settings.topic.trim() || (mode === '1v1' && players.length < 2)
+                  }
+                  className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isGenerating
+                    ? 'Generating...'
+                    : countdown !== null
+                      ? `Starting in ${countdown}`
+                      : "Let's go"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Settings Drawer (mobile) */}
+      {isSettingsOpen && (
+        <div
+          ref={settingsOverlayRef}
+          className="fixed inset-0 z-[100] flex items-stretch justify-end"
+          style={{ backdropFilter: 'blur(10px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSettings();
+          }}
+        >
+          <div
+            ref={settingsPanelRef}
+            className="relative h-full w-[90%] max-w-md rounded-l-2xl border border-white/20 bg-black/40 p-5 shadow-2xl overflow-y-auto"
+            style={{ backdropFilter: 'blur(20px)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={closeSettings}
+              className="absolute right-4 top-4 text-2xl text-white/70 transition-colors hover:text-white"
+            >
+              ×
+            </button>
+
+            <h2 className="mb-4 text-lg font-semibold">Settings</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm text-white/80">Room ID</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 font-mono text-sm truncate">
+                    {roomId}
+                  </div>
+                  <button
+                    onClick={copyLink}
+                    className={`rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap ${
+                      copied
+                        ? 'bg-green-500 text-white'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                  >
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
                 </div>
               </div>
 
@@ -461,29 +694,30 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Let's Go button at the bottom */}
-            {isHost && (
-              <div className="mt-4 pt-4 border-t border-white/20">
-                <button
-                  onClick={handleLetsGo}
-                  disabled={
-                    isGenerating || !settings.topic.trim() || (mode === '1v1' && players.length < 2)
-                  }
-                  className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isGenerating
-                    ? 'Generating...'
-                    : countdown !== null
-                      ? `Starting in ${countdown}`
-                      : "Let's go"}
-                </button>
-              </div>
-            )}
+              {isHost && (
+                <div className="pt-2">
+                  <button
+                    onClick={handleLetsGo}
+                    disabled={
+                      isGenerating ||
+                      !settings.topic.trim() ||
+                      (mode === '1v1' && players.length < 2)
+                    }
+                    className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isGenerating
+                      ? 'Generating...'
+                      : countdown !== null
+                        ? `Starting in ${countdown}`
+                        : "Let's go"}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Game Starting Overlay */}
       {countdown !== null && (

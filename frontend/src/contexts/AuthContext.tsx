@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, AuthContextType } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -10,14 +10,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
-    }
-  }, []);
 
   const logError = (message: string, error: unknown) => {
     if (process.env.NODE_ENV === 'development') {
@@ -30,6 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -44,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: data.email,
         username: data.username,
         isAdmin: data.isAdmin,
-        avatar: data.avatar,
+        avatar: data.profilePic ?? data.avatar,
       };
 
       setUser(userData);
@@ -61,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await fetch(`${API_URL}/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, email, password }),
       });
 
@@ -75,7 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: data.email,
         username: data.username,
         isAdmin: data.isAdmin,
-        avatar: data.avatar,
+        avatar: data.profilePic ?? data.avatar,
       };
 
       setUser(userData);
@@ -92,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
       });
     } catch (error) {
       logError('Logout error:', error);
@@ -107,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await fetch(`${API_URL}/api/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
       });
 
@@ -120,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: updatedUser.email,
         username: updatedUser.username,
         isAdmin: updatedUser.isAdmin,
-        avatar: updatedUser.avatar,
+        avatar: updatedUser.profilePic ?? updatedUser.avatar,
       };
 
       setUser(userData);
@@ -131,8 +127,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const currentUser = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/me`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        setUser(null);
+        setIsAuthenticated(false);
+        localStorage.removeItem('user');
+        return;
+      }
+
+      const data = await response.json();
+      const userData: User = {
+        id: data._id,
+        email: data.email,
+        username: data.username,
+        isAdmin: data.isAdmin,
+        avatar: data.profilePic ?? data.avatar,
+      };
+
+      setUser(userData);
+      setIsAuthenticated(true);
+      localStorage.setItem('user', JSON.stringify(userData));
+    } catch (error) {
+      logError('Current user fetch error:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem('user');
+      return;
+    }
+  }, []);
+
+  // Initialize auth state on mount and refresh session from server
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+      setIsAuthenticated(true);
+    }
+    // Refresh session from server to honor cookie-auth
+    currentUser().catch(() => {});
+  }, [currentUser]);
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated, login, signup, logout, updateProfile, currentUser }}
+    >
       {children}
     </AuthContext.Provider>
   );
