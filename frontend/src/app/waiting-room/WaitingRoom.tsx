@@ -76,10 +76,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       const payload = {
         roomId,
         quizId,
-        username:
-          username && username.trim()
-            ? username
-            : `Guest-${Math.random().toString(36).slice(2, 6)}`,
+        username: username && username.trim(),
         avatar: '',
       };
 
