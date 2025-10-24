@@ -301,3 +301,43 @@ input[type='number']::-webkit-outer-spin-button {
   /* You can also try setting opacity */
   opacity: 0.5;
 }
+
+/* Slim, dark-friendly scrollbars (global) */
+/* Firefox */
+* {
+  scrollbar-width: thin; /* slimmer track */
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent; /* slate-400 thumb on transparent track */
+}
+
+/* Chrome, Edge, Safari */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent; /* let the page background show through */
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.35); /* slate-400 */
+  border-radius: 9999px; /* fully rounded */
+  border: 2px solid transparent; /* creates breathing space without changing width */
+  background-clip: padding-box; /* keep the border transparent look */
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.55); /* slightly brighter on hover */
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Make scrollbars a touch slimmer on very small screens */
+@media (max-width: 640px) {
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+}
