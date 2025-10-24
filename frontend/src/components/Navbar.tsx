@@ -9,14 +9,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import AuthPopup from './AuthPopup';
 import ProfilePopup from './ProfilePopup';
 import Image from 'next/image';
+import JoinRoomPopup from './JoinRoomPopup';
+import QuizPopup from './QuizPopup';
 
-const navItems: string[] = ['Daily', 'Custom', 'Prologue', 'About', 'Contact'];
+const navItems: string[] = ['Daily', 'Custom', 'About', 'Contact'];
 
 const NavBar: React.FC = () => {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isIndicatorActive, setIsIndicatorActive] = useState(false);
   const [isAuthPopupOpen, setIsAuthPopupOpen] = useState(false);
   const [isProfilePopupOpen, setIsProfilePopupOpen] = useState(false);
+  const [isJoinPopupOpen, setIsJoinPopupOpen] = useState(false);
+  const [isQuizPopupOpen, setIsQuizPopupOpen] = useState(false);
 
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const navContainerRef = useRef<HTMLDivElement | null>(null);
@@ -90,12 +94,33 @@ const NavBar: React.FC = () => {
             </div>
 
             <div className="flex h-full items-center gap-4">
-              <div className="hidden md:block">
-                {navItems.map((item, index) => (
-                  <a key={index} href={`#${item.toLowerCase()}`} className="nav-hover-btn">
-                    {item}
-                  </a>
-                ))}
+              <div className="hidden md:flex items-center gap-3">
+                {navItems.map((item, index) => {
+                  if (item === 'Daily') return null; // skip for now
+                  if (item === 'Custom') {
+                    return (
+                      <button
+                        key={index}
+                        className="nav-hover-btn"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setIsQuizPopupOpen(true);
+                        }}
+                      >
+                        {item}
+                      </button>
+                    );
+                  }
+                  const href = `#${item.toLowerCase()}`;
+                  return (
+                    <a key={index} href={href} className="nav-hover-btn">
+                      {item}
+                    </a>
+                  );
+                })}
+                <button onClick={() => setIsJoinPopupOpen(true)} className="nav-hover-btn">
+                  Join Room
+                </button>
               </div>
 
               <button onClick={toggleAudioIndicator} className="ml-6 flex items-center space-x-0.5">
@@ -154,6 +179,8 @@ const NavBar: React.FC = () => {
 
       <AuthPopup isOpen={isAuthPopupOpen} onClose={() => setIsAuthPopupOpen(false)} />
       <ProfilePopup isOpen={isProfilePopupOpen} onClose={() => setIsProfilePopupOpen(false)} />
+      <JoinRoomPopup isOpen={isJoinPopupOpen} onClose={() => setIsJoinPopupOpen(false)} />
+      <QuizPopup open={isQuizPopupOpen} onClose={() => setIsQuizPopupOpen(false)} topic={''} />
     </>
   );
 };

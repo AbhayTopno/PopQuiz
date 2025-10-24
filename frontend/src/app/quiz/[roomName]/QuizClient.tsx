@@ -18,6 +18,7 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
   const [timeLeft, setTimeLeft] = useState<number>(initialDuration ?? 10);
   const [duration] = useState<number>(initialDuration ?? 10);
   const [isFadingOut, setIsFadingOut] = useState(false); // For question transition
+  const [pendingTimeoutReveal, setPendingTimeoutReveal] = useState(false);
 
   // --- Background style (restored from original)
   const backgroundStyle = {
@@ -72,16 +73,31 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleNext(null); // Time's up
-          return duration;
+        if (isLoading || isFinished || showFeedback) return prev;
+        const next = prev - 1;
+        if (next <= 0) {
+          // Show 0s and wait until the progress bar width reaches zero, then reveal
+          setPendingTimeoutReveal(true);
+          return 0;
         }
-        return prev - 1;
+        return next;
       });
     }, 1000);
 
     return () => clearInterval(timer);
   }, [isLoading, isFinished, showFeedback, currentQuestionIndex, duration, handleNext]);
+
+  // When the progress bar finishes shrinking to zero width, reveal the answer for timeout
+  const handleProgressTransitionEnd = useCallback(
+    (e: React.TransitionEvent<HTMLDivElement>) => {
+      if (e.propertyName !== 'width') return;
+      if (!pendingTimeoutReveal) return;
+      if (timeLeft > 0) return;
+      setPendingTimeoutReveal(false);
+      handleNext(null);
+    },
+    [pendingTimeoutReveal, timeLeft, handleNext],
+  );
 
   // --- UI helpers (restored classes & styles) ---
   const getButtonClass = (option: string) => {
@@ -246,20 +262,33 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
 
         {/* --- Main Quiz Card --- */}
         <div className="bg-black/50 rounded-2xl border border-cyan-400/30 p-6 md:p-8 shadow-2xl backdrop-blur-md">
-          {/* Timer Bar */}
-          <div
-            className="w-full bg-gray-700/50 rounded-full h-2.5 mb-6"
-            role="progressbar"
-            aria-valuenow={timeLeft}
-            aria-valuemin={0}
-            aria-valuemax={duration}
-          >
+          {/* Timer Bar with right-side timer pill */}
+          <div className="mb-6 flex items-center gap-3">
             <div
-              className={`h-full rounded-full transition-all duration-1000 ease-linear ${
-                isTimeLow ? 'bg-red-500' : 'bg-cyan-400'
+              className="flex-1 relative h-2.5 bg-gray-700/50 rounded-full overflow-hidden"
+              role="progressbar"
+              aria-valuenow={timeLeft}
+              aria-valuemin={0}
+              aria-valuemax={duration}
+              aria-label="Time remaining"
+            >
+              <div
+                className={`absolute left-0 top-0 h-full ${isTimeLow ? 'bg-red-500' : 'bg-cyan-400'} transition-all duration-1000 ease-linear`}
+                style={{
+                  width: `${Math.max(0, Math.min(100, timePercentage))}%`,
+                }}
+                onTransitionEnd={handleProgressTransitionEnd}
+              />
+            </div>
+            <div
+              className={`min-w-[64px] px-3 py-1 rounded-lg text-sm font-mono text-center border ${
+                isTimeLow
+                  ? 'bg-red-500/20 text-red-200 border-red-500/40'
+                  : 'bg-black/60 text-white border-cyan-400/30'
               }`}
-              style={{ width: `${timePercentage}%` }}
-            />
+            >
+              {timeLeft}s
+            </div>
           </div>
           <h2 className="font-general text-lg md:text-xl mb-8 font-bold text-white text-center">
             {currentQuestion.questionText}
@@ -269,7 +298,7 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
               <button
                 key={option}
                 onClick={() => handleNext(option)}
-                disabled={showFeedback}
+                disabled={showFeedback || timeLeft === 0}
                 className={getButtonClass(option)}
                 aria-label={`Option ${String.fromCharCode(65 + index)}: ${cleanOption(option)}`}
               >

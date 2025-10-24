@@ -11,8 +11,12 @@ services:
       - ../backend/.env
     ports:
       - '5000:5000'
+    environment:
+      - REDIS_URL=redis://redis:6379
     networks:
       - myapp-network
+    depends_on:
+      - redis
 
   frontend:
     build:
@@ -32,6 +36,15 @@ services:
       - '3000:3000'
     depends_on:
       - backend
+    networks:
+      - myapp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: myapp_redis_prod
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
     networks:
       - myapp-network
 

@@ -1,0 +1,503 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import gsap from 'gsap';
+import { getSocket } from '@/utils/socket';
+
+interface WaitingRoomProps {
+  roomId: string;
+  quizId: string;
+  username: string;
+  avatar?: string;
+  isHost: boolean;
+  mode: string;
+  initialSettings: {
+    topic: string;
+    difficulty: string;
+    count: number;
+    duration: number;
+  };
+}
+
+interface Player {
+  id: string;
+  name: string;
+}
+
+interface ChatMessage {
+  id: string;
+  name: string;
+  text: string;
+  ts: number;
+  system?: boolean;
+}
+
+interface Settings {
+  topic: string;
+  difficulty: string;
+  count: number;
+  duration: number;
+}
+
+const difficulties = ['easy', 'medium', 'hard'];
+
+const WaitingRoom: React.FC<WaitingRoomProps> = ({
+  roomId,
+  quizId,
+  username,
+  isHost,
+  mode,
+  initialSettings,
+}) => {
+  const router = useRouter();
+  const socket = useMemo(() => getSocket(), []);
+  const mountedRef = useRef(false);
+
+  const [settings, setSettings] = useState<Settings>(initialSettings);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageInput, setMessageInput] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const messageEndRef = useRef<HTMLDivElement>(null);
+
+  // Connect and join/create room (runs once)
+  useEffect(() => {
+    if (mountedRef.current) return;
+    mountedRef.current = true;
+
+    const onConnect = () => {
+      setConnected(true);
+      const payload = {
+        roomId,
+        quizId,
+        username: username && username.trim(),
+        avatar: '',
+      };
+
+      // Backend uses 'join-room' for both creating and joining
+      socket.emit('join-room', payload);
+    };
+
+    const onDisconnect = () => {
+      setConnected(false);
+    };
+
+    const onConnectError = (error: Error) => {
+      console.error('❌ Socket connection error:', error);
+      setConnected(false);
+    };
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on('connect_error', onConnectError);
+
+    if (socket.connected) {
+      onConnect();
+    } else {
+      socket.connect();
+    }
+
+    return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect_error', onConnectError);
+      socket.emit('leave-room', { roomId });
+      socket.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, roomId, isHost, mode]);
+
+  // Effect for handling incoming socket events
+  useEffect(() => {
+    const handleUsers = (list: Player[]) => setPlayers(list);
+    const handleSettingsUpdate = (s: Settings) => setSettings(s);
+    const handleSettingsCurrent = (s: Settings) => setSettings(s);
+    const handleChat = (payload: ChatMessage) => setMessages((m) => [...m, payload]);
+    const handleChatHistory = (history: ChatMessage[]) =>
+      setMessages((m) => (m.length ? m : history));
+    const handleQuizStart = (payload: { quizId: string; duration: number }) => {
+      if (mode === '1v1') {
+        router.push(
+          `/1v1arena?roomId=${roomId}&quizId=${payload.quizId}&duration=${payload.duration}&username=${username}`,
+        );
+      } else {
+        router.push(`/quiz/${payload.quizId}?duration=${payload.duration}`);
+      }
+    };
+    const handleRoomFull = () => {
+      if (!isHost) router.push('/');
+    };
+    const handleCountdown = (sec: number) => setCountdown(sec);
+
+    // Map old events to new ones
+    socket.on('room:users', handleUsers);
+    socket.on('room-state', (data: { players?: Player[]; messages?: ChatMessage[] }) => {
+      if (data.players) setPlayers(data.players);
+      if (data.messages) handleChatHistory(data.messages);
+    });
+    socket.on('player-joined', (data: { player: { id: string; username: string } }) => {
+      setPlayers((prev) => {
+        const exists = prev.find((p) => p.id === data.player.id);
+        if (exists) return prev;
+        return [...prev, { id: data.player.id, name: data.player.username }];
+      });
+    });
+    socket.on('player-left', (data: { playerId: string }) => {
+      setPlayers((prev) => prev.filter((p) => p.id !== data.playerId));
+    });
+    socket.on('settings:update', handleSettingsUpdate);
+    socket.on('settings:current', handleSettingsCurrent);
+    socket.on(
+      'chat-message',
+      (msg: { id: string; username: string; message: string; timestamp: number }) => {
+        handleChat({
+          id: msg.id,
+          name: msg.username,
+          text: msg.message,
+          ts: msg.timestamp,
+          system: msg.username === 'System',
+        });
+      },
+    );
+    socket.on('quiz:start', handleQuizStart);
+    socket.on('game-start', handleQuizStart);
+    socket.on('room:full', handleRoomFull);
+    socket.on('versus:countdown', handleCountdown);
+
+    return () => {
+      socket.off('room:users', handleUsers);
+      socket.off('room-state');
+      socket.off('player-joined');
+      socket.off('player-left');
+      socket.off('settings:update', handleSettingsUpdate);
+      socket.off('settings:current', handleSettingsCurrent);
+      socket.off('chat-message');
+      socket.off('quiz:start', handleQuizStart);
+      socket.off('game-start', handleQuizStart);
+      socket.off('room:full', handleRoomFull);
+      socket.off('versus:countdown', handleCountdown);
+    };
+  }, [socket, router, isHost, mode, roomId, username]);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  // Animate elements on mount
+  useEffect(() => {
+    gsap.from('.waiting-room-container', {
+      opacity: 0,
+      y: 20,
+      duration: 0.5,
+      ease: 'power2.out',
+    });
+  }, []);
+
+  const updateSettings = (partial: Partial<Settings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...partial };
+      if (isHost) {
+        socket.emit('settings:update', { roomId, settings: next });
+      }
+      return next;
+    });
+  };
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = messageInput.trim();
+    if (!text || !connected) return;
+
+    socket.emit('send-message', { roomId, message: text });
+    setMessageInput('');
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        window.location.href.replace(/([?&])host=1(&|$)/, '$1').replace(/[?&]$/, ''),
+      );
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1000);
+    } catch (e) {
+      if (process.env.NODE_ENV === 'development') console.error('Copy failed', e);
+    }
+  };
+
+  const handleLetsGo = async () => {
+    if (!settings.topic.trim()) return;
+    setIsGenerating(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quiz/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: settings.topic.trim(),
+          difficulty: settings.difficulty,
+          count: settings.count,
+        }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.message || 'Failed to generate quiz');
+      }
+      const data = await res.json();
+      if (!data.quizId) throw new Error('No quiz ID');
+
+      if (mode === '1v1') {
+        socket.emit('versus:init', { roomId, quizId: data.quizId, duration: settings.duration });
+      } else {
+        socket.emit('quiz:start', { roomId, quizId: data.quizId, duration: settings.duration });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    socket.emit('leave-room', { roomId });
+    socket.disconnect();
+    router.push('/');
+  };
+
+  const initial = (n: string) => (n && n.trim() ? n.trim()[0].toUpperCase() : 'U');
+
+  return (
+    <div className="waiting-room-container flex h-screen flex-col bg-gradient-to-br from-slate-900 to-black text-white p-4 md:p-6">
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="font-zentry text-2xl md:text-3xl font-black uppercase">
+          {mode === '1v1' ? '1v1 Waiting Room' : 'Co-op Waiting Room'}
+        </h1>
+        <button
+          onClick={handleLeaveRoom}
+          className="rounded-lg bg-red-500/20 px-4 py-2 font-general text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/30"
+        >
+          Leave Room
+        </button>
+      </div>
+
+      {/* Main Content - 50% Chat / 50% Settings */}
+      <div className="flex flex-1 flex-col lg:flex-row gap-4 lg:gap-6 overflow-hidden">
+        {/* Chat Section - 50% on desktop */}
+        <div className="order-2 lg:order-1 w-full lg:w-1/2 flex flex-col min-h-0">
+          <div className="rounded-2xl border border-white/20 bg-white/5 p-4 backdrop-blur flex flex-col h-full min-h-0">
+            <div className="mb-3 text-sm font-semibold uppercase text-white/80">
+              Players {mode === '1v1' ? '(2 max)' : ''}
+            </div>
+            <div className="mb-4 flex flex-wrap gap-2 overflow-auto max-h-24">
+              {players.map((p, i) => (
+                <span
+                  key={p.id}
+                  className={`rounded px-2 py-1 text-xs flex items-center gap-1 ${
+                    i === 0 ? 'bg-purple-500/50 text-purple-300' : 'bg-white/10'
+                  }`}
+                >
+                  {p.name}
+                  {i === 0 && <span title="Host">👑</span>}
+                </span>
+              ))}
+              {players.length === 0 && (
+                <span className="text-xs text-white/60">Waiting for players…</span>
+              )}
+              {mode === '1v1' && players.length === 2 && (
+                <span className="text-xs text-green-400">All players are here.</span>
+              )}
+            </div>
+
+            <div className="mb-2 text-sm font-semibold uppercase text-white/80">Chat</div>
+            <div className="flex-1 overflow-hidden mb-2">
+              <div
+                ref={chatContainerRef}
+                className="h-full overflow-auto rounded border border-white/10 bg-black/30 p-2 text-xs"
+              >
+                {messages.length === 0 && <div className="text-white/60">No messages yet.</div>}
+                {messages.map((msg) => (
+                  <div key={msg.id} className="mb-2">
+                    {msg.system ? (
+                      <div className="text-center text-white/50 italic py-1">{msg.text}</div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-white/90 text-[10px]">
+                            {initial(msg.name)}
+                          </div>
+                          <span className="text-white/70 text-[11px]">{msg.name}</span>
+                        </div>
+                        <div className="pl-7 text-white/90">{msg.text}</div>
+                      </>
+                    )}
+                  </div>
+                ))}
+                <div ref={messageEndRef} />
+              </div>
+            </div>
+
+            <form onSubmit={handleSendMessage} className="flex gap-2">
+              <input
+                className="flex-1 rounded bg-white/10 px-3 py-2 text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={messageInput}
+                onChange={(e) => setMessageInput(e.target.value)}
+                placeholder="Type a message…"
+                disabled={!connected}
+              />
+              <button
+                disabled={!connected}
+                className="rounded bg-blue-500 px-4 py-2 text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors"
+              >
+                Send
+              </button>
+            </form>
+            {!connected && (
+              <div className="mt-2 text-xs text-red-400">Disconnected from server…</div>
+            )}
+          </div>
+        </div>
+
+        {/* Settings Section - 50% on desktop */}
+        <div className="order-1 lg:order-2 w-full lg:w-1/2 flex flex-col min-h-0">
+          <div className="rounded-2xl border border-white/20 bg-white/5 p-5 backdrop-blur flex flex-col h-full min-h-0">
+            <h2 className="mb-4 text-lg font-semibold">Settings</h2>
+            <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+              <div>
+                <label className="mb-1 block text-sm text-white/80">Room ID</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 rounded-lg border border-white/20 bg-white/5 px-3 py-2 font-mono text-sm truncate">
+                    {roomId}
+                  </div>
+                  <button
+                    onClick={copyLink}
+                    className={`rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap ${
+                      copied
+                        ? 'bg-green-500 text-white'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}
+                  >
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm text-white/80">Username</label>
+                <div className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm">
+                  {username}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm text-white/80">Quiz Topic</label>
+                <input
+                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                  value={settings.topic}
+                  onChange={(e) => updateSettings({ topic: e.target.value })}
+                  disabled={!isHost}
+                  placeholder="Enter topic..."
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm text-white/80">Difficulty</label>
+                <div className="flex gap-2">
+                  {difficulties.map((d) => (
+                    <button
+                      key={d}
+                      disabled={!isHost}
+                      onClick={() => updateSettings({ difficulty: d })}
+                      className={`px-3 py-2 rounded-lg text-sm capitalize transition-colors ${
+                        settings.difficulty === d
+                          ? 'bg-blue-500'
+                          : 'bg-white/10 hover:bg-white/20 disabled:opacity-50'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm text-white/80">Questions</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    value={settings.count}
+                    onChange={(e) =>
+                      updateSettings({
+                        count: Math.min(50, Math.max(1, Number(e.target.value || 1))),
+                      })
+                    }
+                    disabled={!isHost}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-white/80">Duration (sec)</label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={300}
+                    className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                    value={settings.duration}
+                    onChange={(e) =>
+                      updateSettings({
+                        duration: Math.min(300, Math.max(5, Number(e.target.value || 10))),
+                      })
+                    }
+                    disabled={!isHost}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Let's Go button at the bottom */}
+            {isHost && (
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <button
+                  onClick={handleLetsGo}
+                  disabled={
+                    isGenerating || !settings.topic.trim() || (mode === '1v1' && players.length < 2)
+                  }
+                  className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isGenerating
+                    ? 'Generating...'
+                    : countdown !== null
+                      ? `Starting in ${countdown}`
+                      : "Let's go"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Game Starting Overlay */}
+      {countdown !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="text-center">
+            <h2 className="font-zentry text-5xl font-black uppercase text-white animate-pulse">
+              Starting in {countdown}
+            </h2>
+            <p className="mt-4 font-general text-xl text-white/70">Get ready for the battle...</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default WaitingRoom;
