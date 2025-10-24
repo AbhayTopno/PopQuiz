@@ -62,7 +62,7 @@ Follow these initial setup steps before trying any of the deployment strategies.
 
 ---
 
-## deployment Deployment Strategies
+## Deployment Strategies
 
 Choose a strategy below and follow the instructions.
 

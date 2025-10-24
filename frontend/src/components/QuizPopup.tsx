@@ -137,7 +137,26 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
       const result = await response.json();
 
       if (result.quizId) {
-        router.push(`/quiz/${result.quizId}?duration=${finalDuration}`);
+        // If 1v1 or multiplayer mode, go to waiting room
+        if (battleType === '1v1' || battleType === '2v2' || battleType === 'custom') {
+          const roomId = `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const username = 'Player'; // TODO: Get from auth context
+          const params = new URLSearchParams({
+            roomId,
+            quizId: result.quizId,
+            username,
+            host: '1',
+            mode: battleType,
+            topic: quizTopic.trim(),
+            difficulty,
+            count: String(finalQuestionCount),
+            duration: String(finalDuration),
+          });
+          router.push(`/waiting-room?${params.toString()}`);
+        } else {
+          // Solo mode - go directly to quiz
+          router.push(`/quiz/${result.quizId}?duration=${finalDuration}`);
+        }
         handleClose();
       } else {
         throw new Error('No quiz ID returned from server');

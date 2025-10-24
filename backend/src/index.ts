@@ -3,23 +3,49 @@ dotenv.config();
 
 import http from 'http';
 import app from './app.js';
-import { Server } from 'socket.io';
 import { connectDB } from './config/db.js';
+import { connectRedis, disconnectRedis } from './config/redis.js';
+import { initializeSocketIO } from './services/socketio.js';
 
-connectDB();
+// Connect to databases
+const startServer = async () => {
+  try {
+    // Connect to MongoDB
+    await connectDB();
 
-const PORT = process.env.PORT;
+    // Connect to Redis
+    await connectRedis();
 
-const server = http.createServer(app);
+    const PORT = process.env.PORT || 4000;
 
-// Attach socket.io
-const io = new Server(server, {
-  cors: { origin: '*' },
-});
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-});
+    const server = http.createServer(app);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on ${PORT}`);
-});
+    // Initialize Socket.IO
+    initializeSocketIO(server);
+
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🔌 Socket.IO ready for connections`);
+    });
+
+    // Graceful shutdown
+    const gracefulShutdown = async () => {
+      console.log('\n⚠️  Shutting down gracefully...');
+      try {
+        await disconnectRedis();
+        process.exit(0);
+      } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

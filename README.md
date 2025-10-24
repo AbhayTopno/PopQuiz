@@ -43,7 +43,7 @@ PopQuiz is a full-stack web application that allows users to **instantly generat
 - [pnpm](https://pnpm.io/installation) (`npm install -g pnpm`)
 - [Docker](https://www.docker.com/products/docker-desktop/) & Docker Compose
 
-### 1. Clone the Repository
+### Clone the Repository
 
 ````bash
 git clone [https://github.com/your-username/popquiz.git](https://github.com/your-username/popquiz.git)
