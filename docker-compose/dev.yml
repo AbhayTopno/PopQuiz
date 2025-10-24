@@ -15,9 +15,12 @@ services:
       - /usr/src/app/dist # (optional) keep build artifacts inside container
     environment:
       - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
     command: pnpm run dev
     networks:
       - myapp-network
+    depends_on:
+      - redis
 
   frontend:
     build:
@@ -38,6 +41,19 @@ services:
     depends_on:
       - backend
     command: pnpm run dev # Use Next.js dev mode
+    networks:
+      - myapp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_dev
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - myapp-network
 
