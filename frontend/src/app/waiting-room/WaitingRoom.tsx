@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import gsap from 'gsap';
-import { getSocket } from '@/lib/socket';
+import { getSocket } from '@/utils/socket';
 
 interface WaitingRoomProps {
   roomId: string;

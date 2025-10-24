@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QuizData } from '@/types';
-import { getSocket } from '@/lib/socket';
+import { getSocket } from '@/utils/socket';
 import { calculateScore, type Difficulty } from '@/utils/scoring';
 
 type ArenaClientProps = {
