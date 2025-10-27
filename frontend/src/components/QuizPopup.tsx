@@ -28,7 +28,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
 
   const router = useRouter();
   const difficulties = ['easy', 'medium', 'hard'];
-  const battleTypes = ['solo', '1v1', '2v2', 'custom'];
+  const battleTypes = ['solo', '1v1', '2v2', 'coop', 'custom'];
 
   // Update topic when prop changes or popup opens
   useEffect(() => {
@@ -137,8 +137,13 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
       const result = await response.json();
 
       if (result.quizId) {
-        // If 1v1 or multiplayer mode, go to waiting room
-        if (battleType === '1v1' || battleType === '2v2' || battleType === 'custom') {
+        // If 1v1, 2v2, coop, or multiplayer mode, go to waiting room
+        if (
+          battleType === '1v1' ||
+          battleType === '2v2' ||
+          battleType === 'coop' ||
+          battleType === 'custom'
+        ) {
           const roomId = `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           const username = 'Player'; // TODO: Get from auth context
           const params = new URLSearchParams({

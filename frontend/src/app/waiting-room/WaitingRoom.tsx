@@ -23,6 +23,7 @@ interface WaitingRoomProps {
 interface Player {
   id: string;
   name: string;
+  teamId?: string; // 'teamA' or 'teamB'
 }
 
 interface ChatMessage {
@@ -38,6 +39,11 @@ interface Settings {
   difficulty: string;
   count: number;
   duration: number;
+}
+
+interface TeamAssignments {
+  teamA: string[]; // Array of player IDs
+  teamB: string[]; // Array of player IDs
 }
 
 const difficulties = ['easy', 'medium', 'hard'];
@@ -75,6 +81,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
 
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [teamAssignments, setTeamAssignments] = useState<TeamAssignments>({ teamA: [], teamB: [] });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -82,6 +89,12 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
   const [connected, setConnected] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
+  const [dragOverTeam, setDragOverTeam] = useState<'teamA' | 'teamB' | null>(null);
+  const [kickConfirm, setKickConfirm] = useState<{ playerId: string; playerName: string } | null>(
+    null,
+  );
+  const [kickedMessage, setKickedMessage] = useState<string | null>(null);
 
   // Refs for slide-in settings drawer (mobile)
   const settingsOverlayRef = useRef<HTMLDivElement | null>(null);
@@ -102,6 +115,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
         quizId,
         username: username && username.trim(),
         avatar: avatar ?? '',
+        mode: mode || '1v1',
       };
 
       // Backend uses 'join-room' for both creating and joining
@@ -158,30 +172,73 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 }) as ChatMessage,
             ),
       );
+
+    // Handle team assignments update
+    const handleTeamAssignments = (data: { teamA: string[]; teamB: string[] }) => {
+      setTeamAssignments(data);
+      // Update players with their team assignments
+      setPlayers((prevPlayers) =>
+        prevPlayers.map((p) => ({
+          ...p,
+          teamId: data.teamA.includes(p.id)
+            ? 'teamA'
+            : data.teamB.includes(p.id)
+              ? 'teamB'
+              : undefined,
+        })),
+      );
+    };
+
     const handleQuizStart = (payload: { quizId: string; duration: number }) => {
       if (mode === '1v1') {
         router.push(
           `/1v1arena?roomId=${roomId}&quizId=${payload.quizId}&duration=${payload.duration}&username=${username}`,
         );
+      } else if (mode === '2v2') {
+        router.push(
+          `/2v2arena?roomId=${roomId}&quizId=${payload.quizId}&duration=${payload.duration}&username=${username}`,
+        );
+      } else if (mode === 'coop') {
+        router.push(
+          `/cooparena?roomId=${roomId}&quizId=${payload.quizId}&duration=${payload.duration}&username=${username}`,
+        );
       } else {
         router.push(`/quiz/${payload.quizId}?duration=${payload.duration}`);
       }
     };
-    const handleRoomFull = () => {
-      if (!isHost) router.push('/');
+    const handleRoomFull = (data?: { message?: string; maxCapacity?: number }) => {
+      if (!isHost) {
+        alert(data?.message || 'Room is full');
+        router.push('/');
+      }
     };
     const handleCountdown = (sec: number) => setCountdown(sec);
+
+    // Handle being kicked from room
+    const handlePlayerKicked = (data: { message: string }) => {
+      setKickedMessage(data.message);
+      // Redirect to home after 5 seconds
+      setTimeout(() => {
+        router.push('/');
+      }, 5000);
+    };
 
     // Map old events to new ones
     socket.on('room:users', handleUsers);
     socket.on(
       'room-state',
-      (data: { players?: ServerPlayer[]; messages?: ServerChatMessage[] }) => {
-        if (data.players)
+      (data: {
+        players?: ServerPlayer[];
+        messages?: ServerChatMessage[];
+        teamAssignments?: { teamA: string[]; teamB: string[] };
+      }) => {
+        if (data.players) {
           setPlayers(
             data.players.map((p) => ({ id: p.id, name: p.username ?? p.name ?? 'Player' })),
           );
+        }
         if (data.messages) handleChatHistory(data.messages);
+        if (data.teamAssignments) handleTeamAssignments(data.teamAssignments);
       },
     );
     socket.on(
@@ -196,9 +253,15 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     );
     socket.on('player-left', (data: { playerId: string }) => {
       setPlayers((prev) => prev.filter((p) => p.id !== data.playerId));
+      // Remove from team assignments
+      setTeamAssignments((prev) => ({
+        teamA: prev.teamA.filter((id) => id !== data.playerId),
+        teamB: prev.teamB.filter((id) => id !== data.playerId),
+      }));
     });
     socket.on('settings:update', handleSettingsUpdate);
     socket.on('settings:current', handleSettingsCurrent);
+    socket.on('team-assignments', handleTeamAssignments);
     socket.on(
       'chat-message',
       (msg: {
@@ -221,6 +284,8 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     socket.on('game-start', handleQuizStart);
     socket.on('room:full', handleRoomFull);
     socket.on('versus:countdown', handleCountdown);
+    socket.on('coop:countdown', handleCountdown);
+    socket.on('player-kicked', handlePlayerKicked);
 
     return () => {
       socket.off('room:users', handleUsers);
@@ -229,11 +294,14 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       socket.off('player-left');
       socket.off('settings:update', handleSettingsUpdate);
       socket.off('settings:current', handleSettingsCurrent);
+      socket.off('team-assignments', handleTeamAssignments);
       socket.off('chat-message');
       socket.off('quiz:start', handleQuizStart);
       socket.off('game-start', handleQuizStart);
       socket.off('room:full', handleRoomFull);
       socket.off('versus:countdown', handleCountdown);
+      socket.off('coop:countdown', handleCountdown);
+      socket.off('player-kicked', handlePlayerKicked);
     };
   }, [socket, router, isHost, mode, roomId, username]);
 
@@ -342,6 +410,10 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
 
       if (mode === '1v1') {
         socket.emit('versus:init', { roomId, quizId: data.quizId, duration: settings.duration });
+      } else if (mode === '2v2') {
+        socket.emit('2v2:init', { roomId, quizId: data.quizId, duration: settings.duration });
+      } else if (mode === 'coop') {
+        socket.emit('coop:init', { roomId, quizId: data.quizId, duration: settings.duration });
       } else {
         socket.emit('quiz:start', { roomId, quizId: data.quizId, duration: settings.duration });
       }
@@ -358,6 +430,123 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     router.push('/');
   };
 
+  const handleKickPlayer = (playerId: string, playerName: string) => {
+    if (!isHost) return;
+    setKickConfirm({ playerId, playerName });
+  };
+
+  const confirmKick = () => {
+    if (!kickConfirm || !isHost) return;
+    socket.emit('kick-player', { roomId, playerId: kickConfirm.playerId });
+    setKickConfirm(null);
+  };
+
+  const cancelKick = () => {
+    setKickConfirm(null);
+  };
+
+  const assignPlayerToTeam = (playerId: string, teamId: 'teamA' | 'teamB') => {
+    if (!isHost) return;
+
+    setTeamAssignments((prev) => {
+      // Remove player from both teams first
+      const newTeamA = prev.teamA.filter((id) => id !== playerId);
+      const newTeamB = prev.teamB.filter((id) => id !== playerId);
+
+      // Add to selected team
+      if (teamId === 'teamA') {
+        newTeamA.push(playerId);
+      } else {
+        newTeamB.push(playerId);
+      }
+
+      const newAssignments = { teamA: newTeamA, teamB: newTeamB };
+
+      // Emit to server
+      socket.emit('update-team-assignments', { roomId, teamAssignments: newAssignments });
+
+      return newAssignments;
+    });
+  };
+
+  // Auto-assign players by default (alternating)
+  useEffect(() => {
+    if (mode !== '2v2' || !isHost) return;
+
+    const unassignedPlayers = players.filter(
+      (p) => !teamAssignments.teamA.includes(p.id) && !teamAssignments.teamB.includes(p.id),
+    );
+
+    if (unassignedPlayers.length > 0) {
+      setTeamAssignments((prev) => {
+        const newTeamA = [...prev.teamA];
+        const newTeamB = [...prev.teamB];
+
+        unassignedPlayers.forEach((player) => {
+          // Assign to whichever team has fewer players; if equal, assign to Team A
+          if (newTeamA.length < newTeamB.length) {
+            newTeamA.push(player.id);
+          } else if (newTeamB.length < newTeamA.length) {
+            newTeamB.push(player.id);
+          } else {
+            // Equal counts: assign to Team A
+            newTeamA.push(player.id);
+          }
+        });
+
+        const newAssignments = { teamA: newTeamA, teamB: newTeamB };
+
+        // Emit to server
+        socket.emit('update-team-assignments', { roomId, teamAssignments: newAssignments });
+
+        return newAssignments;
+      });
+    }
+  }, [players, mode, isHost, roomId, socket, teamAssignments.teamA, teamAssignments.teamB]);
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, playerId: string) => {
+    if (!isHost) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', playerId);
+    setDraggedPlayerId(playerId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPlayerId(null);
+    setDragOverTeam(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isHost) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnter = (teamId: 'teamA' | 'teamB') => {
+    if (!isHost) return;
+    setDragOverTeam(teamId);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isHost) return;
+    // Only clear if we're leaving the container itself, not a child
+    if (e.currentTarget === e.target) {
+      setDragOverTeam(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetTeam: 'teamA' | 'teamB') => {
+    if (!isHost) return;
+    e.preventDefault();
+    const playerId = e.dataTransfer.getData('text/plain');
+    if (playerId) {
+      assignPlayerToTeam(playerId, targetTeam);
+    }
+    setDraggedPlayerId(null);
+    setDragOverTeam(null);
+  };
+
   const initial = (n: string) => (n && n.trim() ? n.trim()[0].toUpperCase() : 'U');
 
   return (
@@ -365,7 +554,11 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-zentry text-2xl md:text-3xl font-black uppercase">
-          {mode === '1v1' ? '1v1 Waiting Room' : 'Co-op Waiting Room'}
+          {mode === '1v1'
+            ? '1v1 Waiting Room'
+            : mode === '2v2'
+              ? '2v2 Waiting Room'
+              : 'Co-op Waiting Room'}
         </h1>
         <div className="flex items-center gap-2">
           <button
@@ -389,7 +582,14 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
         <div className="order-2 md:order-1 w-full md:w-1/2 flex flex-col min-h-0">
           <div className="rounded-2xl border border-white/20 bg-white/5 p-4 backdrop-blur flex flex-col h-full min-h-0">
             <div className="mb-3 text-sm font-semibold uppercase text-white/80">
-              Players {mode === '1v1' ? '(2 max)' : ''}
+              Players{' '}
+              {mode === '1v1'
+                ? '(2 max)'
+                : mode === '2v2'
+                  ? '(4 max)'
+                  : mode === 'coop'
+                    ? '(2-10 players)'
+                    : ''}
             </div>
             <div className="mb-4 flex flex-wrap gap-2 overflow-auto max-h-24">
               {players.map((p, i) => (
@@ -408,6 +608,9 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 <span className="text-xs text-white/60">Waiting for players…</span>
               )}
               {mode === '1v1' && players.length === 2 && (
+                <span className="text-xs text-green-400">All players are here.</span>
+              )}
+              {mode === '2v2' && players.length === 4 && (
                 <span className="text-xs text-green-400">All players are here.</span>
               )}
             </div>
@@ -496,6 +699,171 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 </div>
               </div>
 
+              {/* Team Management for 2v2 */}
+              {mode === '2v2' && (
+                <div>
+                  <label className="mb-2 block text-sm text-white/80 font-semibold">
+                    Team Assignments {isHost && '(Drag & Drop or Click)'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Team A */}
+                    <div
+                      className={`rounded-lg border p-3 transition-all ${
+                        dragOverTeam === 'teamA'
+                          ? 'border-cyan-400 bg-cyan-500/20 scale-105'
+                          : 'border-cyan-400/30 bg-cyan-500/5'
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDragEnter={() => handleDragEnter('teamA')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, 'teamA')}
+                    >
+                      {React.createElement(
+                        'div',
+                        { className: 'text-xs font-semibold text-cyan-300 mb-2' },
+                        'TEAM A',
+                      )}
+                      <div className="space-y-2 min-h-[60px]">
+                        {teamAssignments.teamA.map((playerId) => {
+                          const player = players.find((p) => p.id === playerId);
+                          if (!player) return null;
+                          const isCurrentUser = playerId === socket.id;
+                          return (
+                            <div
+                              key={playerId}
+                              draggable={isHost}
+                              onDragStart={(e) => handleDragStart(e, playerId)}
+                              onDragEnd={handleDragEnd}
+                              className={`flex items-center justify-between bg-cyan-500/10 rounded px-2 py-1.5 text-xs transition-opacity ${
+                                isHost ? 'cursor-move' : ''
+                              } ${draggedPlayerId === playerId ? 'opacity-50' : ''}`}
+                            >
+                              <span className="text-white truncate">{player.name}</span>
+                              {isHost && !isCurrentUser && (
+                                <button
+                                  onClick={() => handleKickPlayer(playerId, player.name)}
+                                  className="text-red-600 hover:text-red-500 ml-2 text-sm font-bold"
+                                  title="Kick player from room"
+                                >
+                                  ⨯
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {teamAssignments.teamA.length === 0 && (
+                          <div className="text-xs text-white/40 italic">
+                            {isHost ? 'Drop players here' : 'No players yet'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Team B */}
+                    <div
+                      className={`rounded-lg border p-3 transition-all ${
+                        dragOverTeam === 'teamB'
+                          ? 'border-red-400 bg-red-500/20 scale-105'
+                          : 'border-red-400/30 bg-red-500/5'
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDragEnter={() => handleDragEnter('teamB')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, 'teamB')}
+                    >
+                      <div className="text-xs font-semibold text-red-300 mb-2">TEAM B</div>
+                      <div className="space-y-2 min-h-[60px]">
+                        {teamAssignments.teamB.map((playerId) => {
+                          const player = players.find((p) => p.id === playerId);
+                          if (!player) return null;
+                          const isCurrentUser = playerId === socket.id;
+                          return (
+                            <div
+                              key={playerId}
+                              draggable={isHost}
+                              onDragStart={(e) => handleDragStart(e, playerId)}
+                              onDragEnd={handleDragEnd}
+                              className={`flex items-center justify-between bg-red-500/10 rounded px-2 py-1.5 text-xs transition-opacity ${
+                                isHost ? 'cursor-move' : ''
+                              } ${draggedPlayerId === playerId ? 'opacity-50' : ''}`}
+                            >
+                              <span className="text-white truncate">{player.name}</span>
+                              {isHost && !isCurrentUser && (
+                                <button
+                                  onClick={() => handleKickPlayer(playerId, player.name)}
+                                  className="text-red-600 hover:text-red-500 ml-2 text-sm font-bold"
+                                  title="Kick player from room"
+                                >
+                                  ⨯
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {teamAssignments.teamB.length === 0 && (
+                          <div className="text-xs text-white/40 italic">
+                            {isHost ? 'Drop players here' : 'No players yet'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Unassigned Players */}
+                  {isHost && (
+                    <div className="mt-3">
+                      <div className="text-xs text-white/60 mb-2">
+                        Unassigned (Drag or Click to assign):
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {players
+                          .filter(
+                            (p) =>
+                              !teamAssignments.teamA.includes(p.id) &&
+                              !teamAssignments.teamB.includes(p.id),
+                          )
+                          .map((player) => {
+                            const isCurrentUser = player.id === socket.id;
+                            return (
+                              <div
+                                key={player.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, player.id)}
+                                onDragEnd={handleDragEnd}
+                                className={`flex gap-1 ${draggedPlayerId === player.id ? 'opacity-50' : ''}`}
+                              >
+                                <button
+                                  onClick={() => assignPlayerToTeam(player.id, 'teamA')}
+                                  className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 px-2 py-1 rounded text-xs border border-cyan-400/30 cursor-move"
+                                  title="Assign to Team A or drag to team"
+                                >
+                                  {player.name} → A
+                                </button>
+                                <button
+                                  onClick={() => assignPlayerToTeam(player.id, 'teamB')}
+                                  className="bg-red-500/20 hover:bg-red-500/30 text-red-300 px-2 py-1 rounded text-xs border border-red-400/30"
+                                  title="Assign to Team B"
+                                >
+                                  {player.name} → B
+                                </button>
+                                {!isCurrentUser && (
+                                  <button
+                                    onClick={() => handleKickPlayer(player.id, player.name)}
+                                    className="text-red-600 hover:text-red-500 px-2 text-sm font-bold"
+                                    title="Kick player from room"
+                                  >
+                                    ⨯
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-sm text-white/80">Quiz Topic</label>
                 <input
@@ -569,7 +937,12 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 <button
                   onClick={handleLetsGo}
                   disabled={
-                    isGenerating || !settings.topic.trim() || (mode === '1v1' && players.length < 2)
+                    isGenerating ||
+                    !settings.topic.trim() ||
+                    (mode === '1v1' && players.length < 2) ||
+                    (mode === '2v2' &&
+                      (teamAssignments.teamA.length !== 2 || teamAssignments.teamB.length !== 2)) ||
+                    (mode === 'coop' && players.length < 2)
                   }
                   className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
@@ -579,6 +952,17 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                       ? `Starting in ${countdown}`
                       : "Let's go"}
                 </button>
+                {mode === '2v2' &&
+                  (teamAssignments.teamA.length !== 2 || teamAssignments.teamB.length !== 2) && (
+                    <p className="mt-2 text-xs text-yellow-400 text-center">
+                      Each team needs exactly 2 players to start
+                    </p>
+                  )}
+                {mode === 'coop' && players.length < 2 && (
+                  <p className="mt-2 text-xs text-yellow-400 text-center">
+                    Minimum 2 players required to start co-op
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -628,6 +1012,167 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Team Management for 2v2 in Mobile */}
+              {mode === '2v2' && (
+                <div>
+                  <label className="mb-2 block text-sm text-white/80 font-semibold">
+                    Team Assignments {isHost && '(Drag & Drop or Click)'}
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Team A */}
+                    <div
+                      className={`rounded-lg border p-3 transition-all ${
+                        dragOverTeam === 'teamA'
+                          ? 'border-cyan-400 bg-cyan-500/20 scale-105'
+                          : 'border-cyan-400/30 bg-cyan-500/5'
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDragEnter={() => handleDragEnter('teamA')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, 'teamA')}
+                    >
+                      <div className="text-xs font-semibold text-cyan-300 mb-2">TEAM A</div>
+                      <div className="space-y-2 min-h-[60px]">
+                        {teamAssignments.teamA.map((playerId) => {
+                          const player = players.find((p) => p.id === playerId);
+                          if (!player) return null;
+                          const isCurrentUser = playerId === socket.id;
+                          return (
+                            <div
+                              key={playerId}
+                              draggable={isHost}
+                              onDragStart={(e) => handleDragStart(e, playerId)}
+                              onDragEnd={handleDragEnd}
+                              className={`flex items-center justify-between bg-cyan-500/10 rounded px-2 py-1.5 text-xs transition-opacity ${
+                                isHost ? 'cursor-move' : ''
+                              } ${draggedPlayerId === playerId ? 'opacity-50' : ''}`}
+                            >
+                              <span className="text-white truncate">{player.name}</span>
+                              {isHost && !isCurrentUser && (
+                                <button
+                                  onClick={() => handleKickPlayer(playerId, player.name)}
+                                  className="text-red-600 hover:text-red-500 ml-2 text-sm font-bold"
+                                  title="Kick player from room"
+                                >
+                                  ⨯
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {teamAssignments.teamA.length === 0 && (
+                          <div className="text-xs text-white/40 italic">
+                            {isHost ? 'Drop players here' : 'No players yet'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Team B */}
+                    <div
+                      className={`rounded-lg border p-3 transition-all ${
+                        dragOverTeam === 'teamB'
+                          ? 'border-red-400 bg-red-500/20 scale-105'
+                          : 'border-red-400/30 bg-red-500/5'
+                      }`}
+                      onDragOver={handleDragOver}
+                      onDragEnter={() => handleDragEnter('teamB')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, 'teamB')}
+                    >
+                      <div className="text-xs font-semibold text-red-300 mb-2">TEAM B</div>
+                      <div className="space-y-2 min-h-[60px]">
+                        {teamAssignments.teamB.map((playerId) => {
+                          const player = players.find((p) => p.id === playerId);
+                          if (!player) return null;
+                          const isCurrentUser = playerId === socket.id;
+                          return (
+                            <div
+                              key={playerId}
+                              draggable={isHost}
+                              onDragStart={(e) => handleDragStart(e, playerId)}
+                              onDragEnd={handleDragEnd}
+                              className={`flex items-center justify-between bg-red-500/10 rounded px-2 py-1.5 text-xs transition-opacity ${
+                                isHost ? 'cursor-move' : ''
+                              } ${draggedPlayerId === playerId ? 'opacity-50' : ''}`}
+                            >
+                              <span className="text-white truncate">{player.name}</span>
+                              {isHost && !isCurrentUser && (
+                                <button
+                                  onClick={() => handleKickPlayer(playerId, player.name)}
+                                  className="text-red-600 hover:text-red-500 ml-2 text-sm font-bold"
+                                  title="Kick player from room"
+                                >
+                                  ⨯
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {teamAssignments.teamB.length === 0 && (
+                          <div className="text-xs text-white/40 italic">
+                            {isHost ? 'Drop players here' : 'No players yet'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Unassigned Players */}
+                  {isHost && (
+                    <div className="mt-3">
+                      <div className="text-xs text-white/60 mb-2">
+                        Unassigned (Drag or Click to assign):
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {players
+                          .filter(
+                            (p) =>
+                              !teamAssignments.teamA.includes(p.id) &&
+                              !teamAssignments.teamB.includes(p.id),
+                          )
+                          .map((player) => {
+                            const isCurrentUser = player.id === socket.id;
+                            return (
+                              <div
+                                key={player.id}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, player.id)}
+                                onDragEnd={handleDragEnd}
+                                className={`flex gap-1 ${draggedPlayerId === player.id ? 'opacity-50' : ''}`}
+                              >
+                                <button
+                                  onClick={() => assignPlayerToTeam(player.id, 'teamA')}
+                                  className="bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 px-2 py-1 rounded text-xs border border-cyan-400/30 cursor-move"
+                                  title="Assign to Team A or drag to team"
+                                >
+                                  {player.name} → A
+                                </button>
+                                <button
+                                  onClick={() => assignPlayerToTeam(player.id, 'teamB')}
+                                  className="bg-red-500/20 hover:bg-red-500/30 text-red-300 px-2 py-1 rounded text-xs border border-red-400/30"
+                                  title="Assign to Team B"
+                                >
+                                  {player.name} → B
+                                </button>
+                                {!isCurrentUser && (
+                                  <button
+                                    onClick={() => handleKickPlayer(player.id, player.name)}
+                                    className="text-red-600 hover:text-red-500 px-2 text-sm font-bold"
+                                    title="Kick player from room"
+                                  >
+                                    ⨯
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="mb-1 block text-sm text-white/80">Quiz Topic</label>
@@ -702,7 +1247,11 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     disabled={
                       isGenerating ||
                       !settings.topic.trim() ||
-                      (mode === '1v1' && players.length < 2)
+                      (mode === '1v1' && players.length < 2) ||
+                      (mode === '2v2' &&
+                        (teamAssignments.teamA.length !== 2 ||
+                          teamAssignments.teamB.length !== 2)) ||
+                      (mode === 'coop' && players.length < 2)
                     }
                     className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -712,6 +1261,17 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                         ? `Starting in ${countdown}`
                         : "Let's go"}
                   </button>
+                  {mode === '2v2' &&
+                    (teamAssignments.teamA.length !== 2 || teamAssignments.teamB.length !== 2) && (
+                      <p className="mt-2 text-xs text-yellow-400 text-center">
+                        Each team needs exactly 2 players to start
+                      </p>
+                    )}
+                  {mode === 'coop' && players.length < 2 && (
+                    <p className="mt-2 text-xs text-yellow-400 text-center">
+                      Minimum 2 players required to start co-op
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -727,6 +1287,49 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
               Starting in {countdown}
             </h2>
             <p className="mt-4 font-general text-xl text-white/70">Get ready for the battle...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Kick Confirmation Popup */}
+      {kickConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="bg-black/90 rounded-2xl border border-red-500/50 p-8 max-w-md mx-4 text-center shadow-2xl">
+            <h2 className="font-zentry text-3xl font-black uppercase text-white mb-4">
+              Kick Player?
+            </h2>
+            <p className="font-general text-lg text-white/80 mb-6">
+              Are you sure you want to remove{' '}
+              <span className="text-red-400 font-bold">{kickConfirm.playerName}</span> from the
+              room?
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={cancelKick}
+                className="rounded-lg bg-gray-600 px-6 py-3 font-general font-semibold uppercase text-white transition-all hover:bg-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmKick}
+                className="rounded-lg bg-red-600 px-6 py-3 font-general font-semibold uppercase text-white transition-all hover:bg-red-500"
+              >
+                Kick Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Kicked Player Message */}
+      {kickedMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md">
+          <div className="bg-black/90 rounded-2xl border border-red-500/50 p-8 max-w-md mx-4 text-center shadow-2xl">
+            <h2 className="font-zentry text-4xl font-black uppercase text-red-500 mb-4">Kicked!</h2>
+            <p className="font-general text-lg text-white mb-6">{kickedMessage}</p>
+            <p className="font-general text-sm text-white/60">
+              Redirecting to home in 5 seconds...
+            </p>
           </div>
         </div>
       )}

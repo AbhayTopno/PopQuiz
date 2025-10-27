@@ -82,4 +82,30 @@ const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
   res.json(users);
 });
 
-export { signup, login, logout, getUserById, getAllUsers };
+interface AuthRequest extends Request {
+  user?: {
+    _id: string;
+    username: string;
+    email: string;
+    isAdmin: boolean;
+    profilePic?: string;
+  };
+}
+
+const getCurrentUser = asyncHandler(async (req: AuthRequest, res: Response) => {
+  // req.user is attached by the protect middleware
+  if (req.user) {
+    res.json({
+      _id: req.user._id,
+      username: req.user.username,
+      email: req.user.email,
+      isAdmin: req.user.isAdmin,
+      profilePic: req.user.profilePic,
+    });
+  } else {
+    res.status(401);
+    throw new Error('Not authenticated');
+  }
+});
+
+export { signup, login, logout, getUserById, getAllUsers, getCurrentUser };
