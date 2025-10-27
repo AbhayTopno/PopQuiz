@@ -26,9 +26,15 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     // Join a quiz room
     socket.on(
       'join-room',
-      async (data: { roomId: string; quizId: string; username?: string; avatar?: string }) => {
+      async (data: {
+        roomId: string;
+        quizId: string;
+        username?: string;
+        avatar?: string;
+        mode?: string;
+      }) => {
         try {
-          const { roomId, quizId } = data;
+          const { roomId, quizId, mode } = data;
           const payloadUsername = (data.username ?? '').trim();
           const payloadAvatar = data.avatar;
 
@@ -44,7 +50,23 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
               roomId,
               quizId,
               createdAt: Date.now(),
+              mode: mode || '1v1',
             });
+          }
+
+          // Check room capacity based on mode
+          const currentPlayerCount = await redisService.getPlayerCount(roomId);
+          const room = await redisService.getRoom(roomId);
+          const roomMode = room?.mode || mode || '1v1';
+          const maxCapacity = roomMode === '2v2' ? 4 : roomMode === 'coop' ? 10 : 2;
+
+          if (currentPlayerCount >= maxCapacity) {
+            socket.emit('room:full', {
+              message: 'Room is full',
+              maxCapacity,
+              currentCount: currentPlayerCount,
+            });
+            return;
           }
 
           // Add player to room
@@ -77,9 +99,10 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           });
 
           // Get room state
-          const room = await redisService.getRoom(roomId);
+          const roomState = await redisService.getRoom(roomId);
           const players = await redisService.getAllPlayers(roomId);
           const messages = await redisService.getChatMessages(roomId);
+          const teamAssignments = await redisService.getTeamAssignments(roomId);
 
           const playersList = players.map((p) => ({
             id: p.id,
@@ -93,8 +116,9 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           socket.emit('room-state', {
             players: playersList,
             messages,
-            gameStarted: room?.gameStarted || false,
-            gameFinished: room?.gameFinished || false,
+            teamAssignments: teamAssignments || { teamA: [], teamB: [] },
+            gameStarted: roomState?.gameStarted || false,
+            gameFinished: roomState?.gameFinished || false,
           });
 
           // Send system message
@@ -407,6 +431,40 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
       }
     });
 
+    // Kick player (host only)
+    socket.on('kick-player', async (data: { roomId: string; playerId: string }) => {
+      try {
+        const { roomId, playerId } = data;
+
+        // Get the player to kick
+        const player = await redisService.getPlayer(roomId, playerId);
+        if (!player) {
+          console.error('⚠️  Player not found for kick');
+          return;
+        }
+
+        // Remove player from room
+        await redisService.removePlayer(roomId, playerId);
+
+        // Notify the kicked player
+        io.to(playerId).emit('player-kicked', {
+          message: `You have been removed from the room by the host`,
+        });
+
+        // Notify other players in the room
+        const remainingPlayers = await redisService.getPlayerCount(roomId);
+        io.to(roomId).emit('player-left', {
+          playerId,
+          username: player.username,
+          remainingPlayers,
+        });
+
+        console.log(`🚫 Player ${player.username} (${playerId}) was kicked from room ${roomId}`);
+      } catch (error) {
+        console.error('Error in kick-player:', error);
+      }
+    });
+
     // Settings update (host broadcasts settings changes)
     socket.on(
       'settings:update',
@@ -588,6 +646,638 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
         }
       } catch (error) {
         console.error('Error in get-leaderboard:', error);
+      }
+    });
+
+    // ========== 2v2 ARENA HANDLERS ==========
+
+    // Update team assignments (host only)
+    socket.on(
+      'update-team-assignments',
+      async (data: { roomId: string; teamAssignments: { teamA: string[]; teamB: string[] } }) => {
+        try {
+          const { roomId, teamAssignments } = data;
+
+          // Get all players to map IDs to usernames
+          const players = await redisService.getAllPlayers(roomId);
+
+          // Convert player IDs to usernames
+          const usernameAssignments = {
+            teamA: teamAssignments.teamA
+              .map((id) => players.find((p) => p.id === id)?.username)
+              .filter((u): u is string => !!u),
+            teamB: teamAssignments.teamB
+              .map((id) => players.find((p) => p.id === id)?.username)
+              .filter((u): u is string => !!u),
+          };
+
+          // Store team assignments by username (persistent across socket reconnects)
+          await redisService.setTeamAssignmentsByUsername(roomId, usernameAssignments);
+
+          // Also store by current socket IDs for immediate use
+          await redisService.setTeamAssignments(roomId, teamAssignments);
+
+          // Broadcast updated team assignments to all players in the room
+          io.to(roomId).emit('team-assignments', teamAssignments);
+
+          console.log(`👥 Team assignments updated in room ${roomId}:`, teamAssignments);
+          console.log(`👥 Username-based assignments:`, usernameAssignments);
+        } catch (error) {
+          console.error('Error in update-team-assignments:', error);
+        }
+      },
+    );
+
+    // Join 2v2 room and assign teams
+    socket.on(
+      'join-2v2-room',
+      async (data: { roomId: string; quizId: string; username?: string; avatar?: string }) => {
+        try {
+          const { roomId, quizId } = data;
+          const payloadUsername = (data.username ?? '').trim();
+          const payloadAvatar = data.avatar;
+
+          const effectiveUsername =
+            (socket.user?.username || payloadUsername || 'Player').trim() || 'Player';
+          const effectiveAvatar = socket.user?.profilePic ?? payloadAvatar;
+
+          // Create room if it doesn't exist
+          const roomExists = await redisService.roomExists(roomId);
+          if (!roomExists) {
+            await redisService.createRoom({
+              roomId,
+              quizId,
+              createdAt: Date.now(),
+              mode: '2v2',
+            });
+          }
+
+          // Check room capacity for 2v2 mode (max 4 players)
+          const currentPlayerCount = await redisService.getPlayerCount(roomId);
+          if (currentPlayerCount >= 4) {
+            socket.emit('room:full', {
+              message: 'Room is full',
+              maxCapacity: 4,
+              currentCount: currentPlayerCount,
+            });
+            return;
+          }
+
+          // Add player to room
+          const player: Player = {
+            id: socket.id,
+            username: effectiveUsername,
+            avatar: effectiveAvatar,
+            score: 0,
+            currentQuestionIndex: 0,
+            answers: [],
+            isReady: false,
+            joinedAt: Date.now(),
+          };
+
+          await redisService.addPlayer(roomId, player);
+          socket.join(roomId);
+
+          // Get stored team assignments or use default
+          let teamAssignments = await redisService.getTeamAssignments(roomId);
+          const usernameAssignments = await redisService.getTeamAssignmentsByUsername(roomId);
+
+          // Get all players
+          const players = await redisService.getAllPlayers(roomId);
+          const totalPlayers = players.length;
+
+          // Initialize team assignments if they don't exist
+          if (!teamAssignments) {
+            teamAssignments = { teamA: [], teamB: [] };
+          }
+
+          // If we have username-based assignments from waiting room, use them to rebuild socket ID assignments
+          if (
+            usernameAssignments &&
+            (usernameAssignments.teamA.length > 0 || usernameAssignments.teamB.length > 0)
+          ) {
+            console.log(
+              `📋 Found username-based team assignments for room ${roomId}:`,
+              usernameAssignments,
+            );
+
+            // Map usernames to current socket IDs
+            const newTeamAssignments = {
+              teamA: players
+                .filter((p) => usernameAssignments.teamA.includes(p.username))
+                .map((p) => p.id),
+              teamB: players
+                .filter((p) => usernameAssignments.teamB.includes(p.username))
+                .map((p) => p.id),
+            };
+
+            // Update team assignments with current socket IDs
+            teamAssignments = newTeamAssignments;
+            await redisService.setTeamAssignments(roomId, teamAssignments);
+            console.log(`✅ Rebuilt team assignments from usernames:`, teamAssignments);
+          }
+
+          // Clean up stale socket IDs of disconnected players
+          const allStoredIds = [...teamAssignments.teamA, ...teamAssignments.teamB];
+          const currentIds = players.map((p) => p.id);
+          const hasStaleIds = allStoredIds.some((id) => !currentIds.includes(id));
+
+          if (hasStaleIds) {
+            // Remove disconnected players' socket IDs but keep team structure
+            teamAssignments.teamA = teamAssignments.teamA.filter((id) => currentIds.includes(id));
+            teamAssignments.teamB = teamAssignments.teamB.filter((id) => currentIds.includes(id));
+
+            await redisService.setTeamAssignments(roomId, teamAssignments);
+            console.log(`🧹 Cleaned up stale socket IDs for room ${roomId}`, teamAssignments);
+          }
+
+          // Re-fetch team assignments to ensure we have the latest state (handles race conditions)
+          teamAssignments = (await redisService.getTeamAssignments(roomId)) || {
+            teamA: [],
+            teamB: [],
+          };
+
+          // Check if current player is in team assignments, if not, assign them
+          let myTeamId: 'teamA' | 'teamB';
+          console.log(
+            `🔍 Checking assignment for ${effectiveUsername} (${socket.id}). Current assignments:`,
+            { teamA: teamAssignments.teamA, teamB: teamAssignments.teamB },
+          );
+
+          if (teamAssignments.teamA.includes(socket.id)) {
+            myTeamId = 'teamA';
+            console.log(`✅ ${effectiveUsername} already in teamA`);
+          } else if (teamAssignments.teamB.includes(socket.id)) {
+            myTeamId = 'teamB';
+            console.log(`✅ ${effectiveUsername} already in teamB`);
+          } else {
+            // Player not in any team, assign to smaller team based on team assignment array lengths
+            console.log(
+              `🆕 ${effectiveUsername} not in any team. TeamA size: ${teamAssignments.teamA.length}, TeamB size: ${teamAssignments.teamB.length}`,
+            );
+
+            // Re-fetch one more time right before assignment to minimize race condition
+            const latestAssignments = (await redisService.getTeamAssignments(roomId)) || {
+              teamA: [],
+              teamB: [],
+            };
+
+            // Check again if player was assigned by another concurrent request
+            if (latestAssignments.teamA.includes(socket.id)) {
+              myTeamId = 'teamA';
+              teamAssignments = latestAssignments;
+              console.log(`✅ ${effectiveUsername} was concurrently assigned to teamA`);
+            } else if (latestAssignments.teamB.includes(socket.id)) {
+              myTeamId = 'teamB';
+              teamAssignments = latestAssignments;
+              console.log(`✅ ${effectiveUsername} was concurrently assigned to teamB`);
+            } else {
+              // Still not assigned, proceed with assignment
+              if (latestAssignments.teamA.length <= latestAssignments.teamB.length) {
+                myTeamId = 'teamA';
+                if (!latestAssignments.teamA.includes(socket.id)) {
+                  latestAssignments.teamA.push(socket.id);
+                  console.log(`➕ Added ${effectiveUsername} (${socket.id}) to teamA`);
+                }
+              } else {
+                myTeamId = 'teamB';
+                if (!latestAssignments.teamB.includes(socket.id)) {
+                  latestAssignments.teamB.push(socket.id);
+                  console.log(`➕ Added ${effectiveUsername} (${socket.id}) to teamB`);
+                }
+              }
+              await redisService.setTeamAssignments(roomId, latestAssignments);
+              teamAssignments = latestAssignments;
+              console.log(
+                `✅ Assigned ${effectiveUsername} (${socket.id}) to ${myTeamId}. New assignments:`,
+                teamAssignments,
+              );
+            }
+          }
+
+          // Determine team members based on stored assignments (after potential assignment)
+          const teamAMembers = players.filter((p) => teamAssignments.teamA.includes(p.id));
+          const teamBMembers = players.filter((p) => teamAssignments.teamB.includes(p.id));
+
+          // Calculate team scores by summing member scores
+          const teamAScore = teamAMembers.reduce((sum, p) => sum + p.score, 0);
+          const teamBScore = teamBMembers.reduce((sum, p) => sum + p.score, 0);
+
+          const teams = [
+            {
+              teamId: 'teamA',
+              members: teamAMembers.map((p) => ({
+                id: p.id,
+                username: p.username,
+                avatar: p.avatar,
+              })),
+              score: teamAScore,
+              currentQuestionIndex: Math.max(...teamAMembers.map((p) => p.currentQuestionIndex), 0),
+              hasAnswered: false,
+            },
+            {
+              teamId: 'teamB',
+              members: teamBMembers.map((p) => ({
+                id: p.id,
+                username: p.username,
+                avatar: p.avatar,
+              })),
+              score: teamBScore,
+              currentQuestionIndex: Math.max(...teamBMembers.map((p) => p.currentQuestionIndex), 0),
+              hasAnswered: false,
+            },
+          ];
+
+          // Send team assignment to the newly joined player
+          socket.emit('team-assignment', { teamId: myTeamId, teams });
+
+          // Notify all players about updated teams
+          io.to(roomId).emit('teams-update', { teams, totalPlayers });
+
+          // Send system message
+          const systemMessage: ChatMessage = {
+            id: `${Date.now()}-${Math.random()}`,
+            username: 'System',
+            message: `${effectiveUsername} joined the room`,
+            timestamp: Date.now(),
+          };
+          await redisService.addChatMessage(roomId, systemMessage);
+          io.to(roomId).emit('chat-message', systemMessage);
+
+          console.log(`👥 ${effectiveUsername} joined 2v2 room ${roomId} on ${myTeamId}`);
+        } catch (error) {
+          console.error('Error in join-2v2-room:', error);
+          socket.emit('error', { message: 'Failed to join 2v2 room' });
+        }
+      },
+    ); // Submit team answer (each player progresses independently, scores are shared)
+    socket.on(
+      'submit-team-answer',
+      async (data: {
+        roomId: string;
+        teamId: string;
+        answer: string | null;
+        isCorrect: boolean;
+        points: number;
+        currentQuestion: number;
+        timeLeft: number;
+      }) => {
+        try {
+          const { roomId, teamId, answer, isCorrect, points, currentQuestion } = data;
+
+          // Get stored team assignments
+          const teamAssignments = await redisService.getTeamAssignments(roomId);
+          if (!teamAssignments) {
+            console.error('⚠️  No team assignments found for room', roomId);
+            return;
+          }
+
+          // Get all players in the room
+          const players = await redisService.getAllPlayers(roomId);
+
+          // Determine team members based on stored assignments
+          const teamMemberIds = teamId === 'teamA' ? teamAssignments.teamA : teamAssignments.teamB;
+          const teamMembers = players.filter((p) => teamMemberIds.includes(p.id));
+
+          // Validate that the socket is actually in this team
+          if (!teamMemberIds.includes(socket.id)) {
+            console.error(
+              `⚠️  Player ${socket.id} tried to submit for ${teamId} but is not in that team`,
+            );
+            console.log('Team assignments:', teamAssignments);
+            console.log(
+              'All players:',
+              players.map((p) => ({ id: p.id, username: p.username })),
+            );
+            return;
+          }
+
+          // BOTH teams use coop mechanics - broadcast lock so ALL teammates advance together
+          io.to(roomId).emit('team-answer-locked', {
+            teamId,
+            currentQuestion,
+            answeredBy: socket.id,
+            answer,
+            isCorrect,
+          });
+
+          // Cooperative team behavior for BOTH Team A and Team B
+          // Apply points and advance question for ALL team members
+          for (const member of teamMembers) {
+            const updatedScore = member.score + points;
+            await redisService.updatePlayer(roomId, member.id, {
+              score: updatedScore,
+              currentQuestionIndex: currentQuestion + 1,
+            });
+          }
+
+          // Calculate team's total score (sum of all team members)
+          const updatedPlayers = await redisService.getAllPlayers(roomId);
+          const updatedTeamMembers = updatedPlayers.filter((p) => teamMemberIds.includes(p.id));
+          const teamScore = updatedTeamMembers.reduce((sum, p) => sum + p.score, 0);
+
+          // Broadcast team score update to ALL players (both teams see each other's scores)
+          io.to(roomId).emit('team-score-update', {
+            teamId,
+            score: teamScore,
+            currentQuestion: currentQuestion + 1,
+            answeredBy: socket.id,
+            answer,
+            isCorrect,
+          });
+
+          console.log(
+            `📊 Player ${socket.id} from ${teamId} answered Q${currentQuestion}: ${isCorrect ? 'Correct' : 'Wrong'} (+${points} pts) - Team Total: ${teamScore}`,
+          );
+        } catch (error) {
+          console.error('Error in submit-team-answer:', error);
+        }
+      },
+    );
+
+    // Team finished quiz (individual player finishes)
+    socket.on('team-quiz-finished', async (data: { roomId: string; teamId: string }) => {
+      try {
+        const { roomId, teamId } = data;
+
+        // Get stored team assignments
+        const teamAssignments = await redisService.getTeamAssignments(roomId);
+        if (!teamAssignments) {
+          console.error('⚠️  No team assignments found for room', roomId);
+          return;
+        }
+
+        // Mark only this player as finished
+        await redisService.updatePlayer(roomId, socket.id, { isReady: true });
+
+        // Check if all team members finished
+        const players = await redisService.getAllPlayers(roomId);
+        const teamMemberIds = teamId === 'teamA' ? teamAssignments.teamA : teamAssignments.teamB;
+        const teamMembers = players.filter((p) => teamMemberIds.includes(p.id));
+        const teamFinished = teamMembers.every((p) => p.isReady);
+
+        if (teamFinished) {
+          // Calculate team's final score
+          const teamScore = teamMembers.reduce((sum, p) => sum + p.score, 0);
+
+          // Notify room that this team finished
+          io.to(roomId).emit('team-finished', {
+            teamId,
+            score: teamScore,
+            members: teamMembers.map((p) => ({
+              id: p.id,
+              username: p.username,
+              avatar: p.avatar,
+              score: p.score,
+            })),
+          });
+
+          console.log(`🏁 ${teamId} finished with score: ${teamScore}`);
+
+          // Check if both teams finished
+          const allPlayers = await redisService.getAllPlayers(roomId);
+          const teamAMembers = allPlayers.filter((p) => teamAssignments.teamA.includes(p.id));
+          const teamBMembers = allPlayers.filter((p) => teamAssignments.teamB.includes(p.id));
+
+          const teamAFinished = teamAMembers.every((p) => p.isReady);
+          const teamBFinished = teamBMembers.every((p) => p.isReady);
+
+          if (teamAFinished && teamBFinished) {
+            const teamAScore = teamAMembers.reduce((sum, p) => sum + p.score, 0);
+            const teamBScore = teamBMembers.reduce((sum, p) => sum + p.score, 0);
+
+            const teams = [
+              {
+                teamId: 'teamA',
+                members: teamAMembers.map((p) => ({
+                  id: p.id,
+                  username: p.username,
+                  avatar: p.avatar,
+                })),
+                score: teamAScore,
+                currentQuestionIndex: 0,
+                hasAnswered: false,
+              },
+              {
+                teamId: 'teamB',
+                members: teamBMembers.map((p) => ({
+                  id: p.id,
+                  username: p.username,
+                  avatar: p.avatar,
+                })),
+                score: teamBScore,
+                currentQuestionIndex: 0,
+                hasAnswered: false,
+              },
+            ];
+
+            // Broadcast battle complete
+            io.to(roomId).emit('2v2-battle-complete', { teams });
+            console.log(`⚔️  2v2 Battle completed in room ${roomId}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error in team-quiz-finished:', error);
+      }
+    });
+
+    // Initialize 2v2 versus mode
+    socket.on('2v2:init', async (data: { roomId: string; quizId: string; duration: number }) => {
+      try {
+        const { roomId, quizId, duration } = data;
+        await redisService.updateRoomStatus(roomId, { gameStarted: true });
+
+        // Start countdown for 2v2 mode
+        let countdown = 3;
+        const countdownInterval = setInterval(() => {
+          if (countdown > 0) {
+            io.to(roomId).emit('versus:countdown', countdown);
+            countdown--;
+          } else {
+            clearInterval(countdownInterval);
+            io.to(roomId).emit('quiz:start', { quizId, duration });
+            console.log(`⚔️  2v2 battle started in room ${roomId}: ${quizId}`);
+          }
+        }, 1000);
+      } catch (error) {
+        console.error('Error in 2v2:init:', error);
+        socket.emit('error', { message: 'Failed to start 2v2 battle' });
+      }
+    });
+
+    // ===== CO-OP MODE HANDLERS =====
+
+    // Helper to get/set co-op data (using redis client directly like team assignments)
+    const getCoopData = async (key: string): Promise<string | null> => {
+      const redis = await import('../config/redis.js').then((m) => m.getRedisClient());
+      return await redis.get(key);
+    };
+
+    const setCoopData = async (key: string, value: string, ttl = 7200): Promise<void> => {
+      const redis = await import('../config/redis.js').then((m) => m.getRedisClient());
+      await redis.set(key, value);
+      await redis.expire(key, ttl);
+    };
+
+    // Join co-op room
+    socket.on(
+      'join-coop-room',
+      async (data: { roomId: string; quizId: string; username?: string; avatar?: string }) => {
+        try {
+          const { roomId, quizId } = data;
+          const payloadUsername = (data.username ?? '').trim();
+          const payloadAvatar = data.avatar;
+
+          const effectiveUsername =
+            (socket.user?.username || payloadUsername || 'Player').trim() || 'Player';
+          const effectiveAvatar = socket.user?.profilePic ?? payloadAvatar;
+
+          // Get or create co-op team score
+          const teamScoreKey = `coop:${roomId}:score`;
+          let teamScore = await getCoopData(teamScoreKey);
+          if (teamScore === null) {
+            await setCoopData(teamScoreKey, '0');
+            teamScore = '0';
+          }
+
+          // Add player to co-op team
+          const coopMembersKey = `coop:${roomId}:members`;
+          const existingMembers = await getCoopData(coopMembersKey);
+          const members = existingMembers ? JSON.parse(existingMembers) : [];
+
+          // Check if player already in team
+          const existingMemberIndex = members.findIndex((m: any) => m.id === socket.id);
+          if (existingMemberIndex === -1) {
+            members.push({
+              id: socket.id,
+              username: effectiveUsername,
+              avatar: effectiveAvatar,
+            });
+            await setCoopData(coopMembersKey, JSON.stringify(members));
+          }
+
+          socket.join(roomId);
+
+          // Send team update to all members
+          io.to(roomId).emit('coop-team-update', {
+            members,
+            score: parseInt(teamScore, 10),
+          });
+
+          console.log(`🤝 ${effectiveUsername} joined co-op room ${roomId}`);
+        } catch (error) {
+          console.error('Error in join-coop-room:', error);
+          socket.emit('error', { message: 'Failed to join co-op room' });
+        }
+      },
+    );
+
+    // Submit co-op answer
+    socket.on(
+      'submit-coop-answer',
+      async (data: {
+        roomId: string;
+        answer: string | null;
+        isCorrect: boolean;
+        points: number;
+        currentQuestion: number;
+        timeLeft: number;
+      }) => {
+        try {
+          const { roomId, answer, isCorrect, points, currentQuestion } = data;
+
+          // Get player info
+          const coopMembersKey = `coop:${roomId}:members`;
+          const membersData = await getCoopData(coopMembersKey);
+          const members = membersData ? JSON.parse(membersData) : [];
+          const answeringPlayer = members.find((m: any) => m.id === socket.id);
+          const playerName = answeringPlayer?.username || 'Someone';
+
+          // Lock all players immediately and send answer info
+          io.to(roomId).emit('coop-answer-locked', {
+            answeredBy: socket.id,
+            playerName,
+            answer,
+            isCorrect,
+          });
+
+          // Update team score
+          const teamScoreKey = `coop:${roomId}:score`;
+          const currentScoreStr = await getCoopData(teamScoreKey);
+          const currentScore = currentScoreStr ? parseInt(currentScoreStr, 10) : 0;
+          const newScore = currentScore + (isCorrect ? points : 0);
+          await setCoopData(teamScoreKey, String(newScore));
+
+          // Broadcast score update
+          io.to(roomId).emit('coop-score-update', {
+            score: newScore,
+            currentQuestion,
+            answeredBy: socket.id,
+            answer,
+            isCorrect,
+          });
+
+          console.log(
+            `🤝 Co-op answer in room ${roomId} by ${playerName}: ${isCorrect ? 'correct' : 'incorrect'}, +${points} points`,
+          );
+        } catch (error) {
+          console.error('Error in submit-coop-answer:', error);
+        }
+      },
+    );
+
+    // Co-op quiz finished
+    socket.on('coop-quiz-finished', async (data: { roomId: string }) => {
+      try {
+        const { roomId } = data;
+
+        // Get final score and members
+        const teamScoreKey = `coop:${roomId}:score`;
+        const coopMembersKey = `coop:${roomId}:members`;
+
+        const scoreStr = await getCoopData(teamScoreKey);
+        const membersData = await getCoopData(coopMembersKey);
+
+        const finalScore = scoreStr ? parseInt(scoreStr, 10) : 0;
+        const members = membersData ? JSON.parse(membersData) : [];
+
+        // Broadcast completion
+        io.to(roomId).emit('coop-quiz-complete', {
+          finalScore,
+          members,
+        });
+
+        console.log(`🤝 Co-op quiz completed in room ${roomId}. Final Score: ${finalScore}`);
+      } catch (error) {
+        console.error('Error in coop-quiz-finished:', error);
+      }
+    });
+
+    // Initialize co-op mode
+    socket.on('coop:init', async (data: { roomId: string; quizId: string; duration: number }) => {
+      try {
+        const { roomId, quizId, duration } = data;
+        await redisService.updateRoomStatus(roomId, { gameStarted: true });
+
+        // Initialize co-op team score
+        const teamScoreKey = `coop:${roomId}:score`;
+        await setCoopData(teamScoreKey, '0');
+
+        // Start countdown
+        let countdown = 3;
+        const countdownInterval = setInterval(() => {
+          if (countdown > 0) {
+            io.to(roomId).emit('coop:countdown', countdown);
+            countdown--;
+          } else {
+            clearInterval(countdownInterval);
+            io.to(roomId).emit('quiz:start', { quizId, duration });
+            console.log(`🤝 Co-op quiz started in room ${roomId}: ${quizId}`);
+          }
+        }, 1000);
+      } catch (error) {
+        console.error('Error in coop:init:', error);
+        socket.emit('error', { message: 'Failed to start co-op quiz' });
       }
     });
   });

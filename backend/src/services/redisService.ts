@@ -11,6 +11,7 @@ const ROOM_KEY = 'room:';
 const CHAT_KEY = 'chat:';
 const PLAYERS_KEY = 'players:';
 const LEADERBOARD_KEY = 'leaderboard:';
+const TEAM_ASSIGNMENTS_KEY = 'team-assignments:';
 
 // TTL (Time To Live) in seconds
 const ROOM_TTL = 24 * 60 * 60; // 24 hours
@@ -23,6 +24,7 @@ export const createRoom = async (roomData: {
   roomId: string;
   quizId: string;
   createdAt: number;
+  mode?: string;
 }): Promise<void> => {
   const redis = getRedisClient();
   const roomKey = `${ROOM_KEY}${roomData.roomId}`;
@@ -33,6 +35,7 @@ export const createRoom = async (roomData: {
     createdAt: roomData.createdAt.toString(),
     gameStarted: 'false',
     gameFinished: 'false',
+    mode: roomData.mode || '1v1',
   });
 
   await redis.expire(roomKey, ROOM_TTL);
@@ -57,6 +60,7 @@ export const getRoom = async (roomId: string): Promise<Partial<Room> | null> => 
     createdAt: parseInt(roomData.createdAt, 10),
     gameStarted: roomData.gameStarted === 'true',
     gameFinished: roomData.gameFinished === 'true',
+    mode: roomData.mode || '1v1',
   };
 };
 
@@ -359,4 +363,78 @@ export const cleanupEmptyRooms = async (): Promise<number> => {
   }
 
   return cleanedCount;
+};
+
+/**
+ * Set team assignments for a 2v2 room (by username, not socket ID)
+ */
+export const setTeamAssignmentsByUsername = async (
+  roomId: string,
+  teamAssignments: { teamA: string[]; teamB: string[] },
+): Promise<void> => {
+  const redis = getRedisClient();
+  const teamKey = `team_usernames:${roomId}`;
+
+  // Deduplicate team arrays
+  const deduplicatedAssignments = {
+    teamA: [...new Set(teamAssignments.teamA)],
+    teamB: [...new Set(teamAssignments.teamB)],
+  };
+
+  await redis.set(teamKey, JSON.stringify(deduplicatedAssignments));
+  await redis.expire(teamKey, ROOM_TTL);
+};
+
+/**
+ * Get team assignments by username for a 2v2 room
+ */
+export const getTeamAssignmentsByUsername = async (
+  roomId: string,
+): Promise<{ teamA: string[]; teamB: string[] } | null> => {
+  const redis = getRedisClient();
+  const teamKey = `team_usernames:${roomId}`;
+  const data = await redis.get(teamKey);
+  return data ? JSON.parse(data) : null;
+};
+
+/**
+ * Set team assignments for a 2v2 room (by socket ID)
+ */
+export const setTeamAssignments = async (
+  roomId: string,
+  teamAssignments: { teamA: string[]; teamB: string[] },
+): Promise<void> => {
+  const redis = getRedisClient();
+  const teamKey = `${TEAM_ASSIGNMENTS_KEY}${roomId}`;
+
+  // Deduplicate team arrays to prevent duplicate player IDs
+  const deduplicatedAssignments = {
+    teamA: [...new Set(teamAssignments.teamA)],
+    teamB: [...new Set(teamAssignments.teamB)],
+  };
+
+  await redis.set(teamKey, JSON.stringify(deduplicatedAssignments));
+  await redis.expire(teamKey, ROOM_TTL);
+};
+
+/**
+ * Get team assignments for a 2v2 room
+ */
+export const getTeamAssignments = async (
+  roomId: string,
+): Promise<{ teamA: string[]; teamB: string[] } | null> => {
+  const redis = getRedisClient();
+  const teamKey = `${TEAM_ASSIGNMENTS_KEY}${roomId}`;
+
+  const data = await redis.get(teamKey);
+  if (!data) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error parsing team assignments:', error);
+    return null;
+  }
 };

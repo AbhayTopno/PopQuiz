@@ -24,6 +24,7 @@ export interface Room {
   createdAt: number;
   gameStarted: boolean;
   gameFinished: boolean;
+  mode?: string; // Game mode: '1v1' or '2v2'
 }
 
 // Chat message interface
