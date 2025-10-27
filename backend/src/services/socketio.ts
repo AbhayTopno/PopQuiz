@@ -58,7 +58,8 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           const currentPlayerCount = await redisService.getPlayerCount(roomId);
           const room = await redisService.getRoom(roomId);
           const roomMode = room?.mode || mode || '1v1';
-          const maxCapacity = roomMode === '2v2' ? 4 : roomMode === 'coop' ? 10 : 2;
+          const maxCapacity =
+            roomMode === '2v2' ? 4 : roomMode === 'coop' || roomMode === 'custom' ? 10 : 2;
 
           if (currentPlayerCount >= maxCapacity) {
             socket.emit('room:full', {
@@ -859,9 +860,9 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           const teamAMembers = players.filter((p) => teamAssignments.teamA.includes(p.id));
           const teamBMembers = players.filter((p) => teamAssignments.teamB.includes(p.id));
 
-          // Calculate team scores by summing member scores
-          const teamAScore = teamAMembers.reduce((sum, p) => sum + p.score, 0);
-          const teamBScore = teamBMembers.reduce((sum, p) => sum + p.score, 0);
+          // Get shared team scores (not sum of individual player scores)
+          const teamAScore = await redisService.getTeamScore(roomId, 'teamA');
+          const teamBScore = await redisService.getTeamScore(roomId, 'teamB');
 
           const teams = [
             {
@@ -961,25 +962,21 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             isCorrect,
           });
 
-          // Cooperative team behavior for BOTH Team A and Team B
-          // Apply points and advance question for ALL team members
+          // Cooperative team behavior - ONE shared score for the whole team
+          // Only increment the team score once (not per member)
+          const newTeamScore = await redisService.incrementTeamScore(roomId, teamId, points);
+
+          // Advance question index for ALL team members (but don't touch individual scores)
           for (const member of teamMembers) {
-            const updatedScore = member.score + points;
             await redisService.updatePlayer(roomId, member.id, {
-              score: updatedScore,
               currentQuestionIndex: currentQuestion + 1,
             });
           }
 
-          // Calculate team's total score (sum of all team members)
-          const updatedPlayers = await redisService.getAllPlayers(roomId);
-          const updatedTeamMembers = updatedPlayers.filter((p) => teamMemberIds.includes(p.id));
-          const teamScore = updatedTeamMembers.reduce((sum, p) => sum + p.score, 0);
-
           // Broadcast team score update to ALL players (both teams see each other's scores)
           io.to(roomId).emit('team-score-update', {
             teamId,
-            score: teamScore,
+            score: newTeamScore,
             currentQuestion: currentQuestion + 1,
             answeredBy: socket.id,
             answer,
@@ -987,7 +984,7 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           });
 
           console.log(
-            `📊 Player ${socket.id} from ${teamId} answered Q${currentQuestion}: ${isCorrect ? 'Correct' : 'Wrong'} (+${points} pts) - Team Total: ${teamScore}`,
+            `📊 Player ${socket.id} from ${teamId} answered Q${currentQuestion}: ${isCorrect ? 'Correct' : 'Wrong'} (+${points} pts) - Team Total: ${newTeamScore}`,
           );
         } catch (error) {
           console.error('Error in submit-team-answer:', error);
@@ -1017,8 +1014,8 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
         const teamFinished = teamMembers.every((p) => p.isReady);
 
         if (teamFinished) {
-          // Calculate team's final score
-          const teamScore = teamMembers.reduce((sum, p) => sum + p.score, 0);
+          // Get team's shared score (not sum of individual scores)
+          const teamScore = await redisService.getTeamScore(roomId, teamId);
 
           // Notify room that this team finished
           io.to(roomId).emit('team-finished', {
@@ -1063,8 +1060,9 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           console.log(`   Team A finished: ${teamAFinished}, Team B finished: ${teamBFinished}`);
 
           if (teamAFinished && teamBFinished) {
-            const teamAScore = teamAMembers.reduce((sum, p) => sum + p.score, 0);
-            const teamBScore = teamBMembers.reduce((sum, p) => sum + p.score, 0);
+            // Get shared team scores (not sum of individual scores)
+            const teamAScore = await redisService.getTeamScore(roomId, 'teamA');
+            const teamBScore = await redisService.getTeamScore(roomId, 'teamB');
 
             const teams = [
               {
@@ -1122,6 +1120,254 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
       } catch (error) {
         console.error('Error in 2v2:init:', error);
         socket.emit('error', { message: 'Failed to start 2v2 battle' });
+      }
+    });
+
+    // ===== CUSTOM MODE HANDLERS (Reuses 2v2 logic with flexible team sizes) =====
+
+    // Join custom room (uses same logic as 2v2 but allows any team composition)
+    socket.on(
+      'join-custom-room',
+      async (data: { roomId: string; quizId: string; username?: string; avatar?: string }) => {
+        try {
+          const { roomId, quizId } = data;
+          const payloadUsername = (data.username ?? '').trim();
+          const payloadAvatar = data.avatar;
+
+          const effectiveUsername =
+            (socket.user?.username || payloadUsername || 'Player').trim() || 'Player';
+          const effectiveAvatar = socket.user?.profilePic ?? payloadAvatar;
+
+          // Create room if it doesn't exist
+          const roomExists = await redisService.roomExists(roomId);
+          if (!roomExists) {
+            await redisService.createRoom({
+              roomId,
+              quizId,
+              createdAt: Date.now(),
+              mode: 'custom',
+            });
+          }
+
+          // Check room capacity for custom mode (max 10 players)
+          const currentPlayerCount = await redisService.getPlayerCount(roomId);
+          if (currentPlayerCount >= 10) {
+            socket.emit('room:full', {
+              message: 'Room is full (max 10 players)',
+              maxCapacity: 10,
+              currentCount: currentPlayerCount,
+            });
+            return;
+          }
+
+          // Add player to room
+          const player: Player = {
+            id: socket.id,
+            username: effectiveUsername,
+            avatar: effectiveAvatar,
+            score: 0,
+            currentQuestionIndex: 0,
+            answers: [],
+            isReady: false,
+            joinedAt: Date.now(),
+          };
+
+          await redisService.addPlayer(roomId, player);
+          socket.join(roomId);
+
+          // Get stored team assignments or use default
+          let teamAssignments = await redisService.getTeamAssignments(roomId);
+          const usernameAssignments = await redisService.getTeamAssignmentsByUsername(roomId);
+
+          // Get all players
+          const players = await redisService.getAllPlayers(roomId);
+          const totalPlayers = players.length;
+
+          // Initialize team assignments if they don't exist
+          if (!teamAssignments) {
+            teamAssignments = { teamA: [], teamB: [] };
+          }
+
+          // If we have username-based assignments from waiting room, use them
+          if (
+            usernameAssignments &&
+            (usernameAssignments.teamA.length > 0 || usernameAssignments.teamB.length > 0)
+          ) {
+            console.log(
+              `📋 Found username-based team assignments for custom room ${roomId}:`,
+              usernameAssignments,
+            );
+
+            // Map usernames to current socket IDs
+            const newTeamAssignments = {
+              teamA: players
+                .filter((p) => usernameAssignments.teamA.includes(p.username))
+                .map((p) => p.id),
+              teamB: players
+                .filter((p) => usernameAssignments.teamB.includes(p.username))
+                .map((p) => p.id),
+            };
+
+            teamAssignments = newTeamAssignments;
+            await redisService.setTeamAssignments(roomId, teamAssignments);
+            console.log(`✅ Rebuilt custom team assignments from usernames:`, teamAssignments);
+          }
+
+          // Clean up stale socket IDs
+          const allStoredIds = [...teamAssignments.teamA, ...teamAssignments.teamB];
+          const currentIds = players.map((p) => p.id);
+          const hasStaleIds = allStoredIds.some((id) => !currentIds.includes(id));
+
+          if (hasStaleIds) {
+            teamAssignments.teamA = teamAssignments.teamA.filter((id) => currentIds.includes(id));
+            teamAssignments.teamB = teamAssignments.teamB.filter((id) => currentIds.includes(id));
+            await redisService.setTeamAssignments(roomId, teamAssignments);
+            console.log(
+              `🧹 Cleaned up stale socket IDs for custom room ${roomId}`,
+              teamAssignments,
+            );
+          }
+
+          // Re-fetch team assignments
+          teamAssignments = (await redisService.getTeamAssignments(roomId)) || {
+            teamA: [],
+            teamB: [],
+          };
+
+          // Check if current player is in team assignments
+          let myTeamId: 'teamA' | 'teamB';
+          console.log(
+            `🔍 Checking assignment for ${effectiveUsername} (${socket.id}) in custom room. Current assignments:`,
+            { teamA: teamAssignments.teamA, teamB: teamAssignments.teamB },
+          );
+
+          if (teamAssignments.teamA.includes(socket.id)) {
+            myTeamId = 'teamA';
+            console.log(`✅ ${effectiveUsername} already in teamA`);
+          } else if (teamAssignments.teamB.includes(socket.id)) {
+            myTeamId = 'teamB';
+            console.log(`✅ ${effectiveUsername} already in teamB`);
+          } else {
+            // Player not in any team, assign to smaller team (default balancing)
+            console.log(
+              `🆕 ${effectiveUsername} not in any team. TeamA size: ${teamAssignments.teamA.length}, TeamB size: ${teamAssignments.teamB.length}`,
+            );
+
+            const latestAssignments = (await redisService.getTeamAssignments(roomId)) || {
+              teamA: [],
+              teamB: [],
+            };
+
+            if (latestAssignments.teamA.includes(socket.id)) {
+              myTeamId = 'teamA';
+              teamAssignments = latestAssignments;
+              console.log(`✅ ${effectiveUsername} was concurrently assigned to teamA`);
+            } else if (latestAssignments.teamB.includes(socket.id)) {
+              myTeamId = 'teamB';
+              teamAssignments = latestAssignments;
+              console.log(`✅ ${effectiveUsername} was concurrently assigned to teamB`);
+            } else {
+              // Assign to smaller team
+              if (latestAssignments.teamA.length <= latestAssignments.teamB.length) {
+                myTeamId = 'teamA';
+                if (!latestAssignments.teamA.includes(socket.id)) {
+                  latestAssignments.teamA.push(socket.id);
+                  console.log(`➕ Added ${effectiveUsername} (${socket.id}) to teamA`);
+                }
+              } else {
+                myTeamId = 'teamB';
+                if (!latestAssignments.teamB.includes(socket.id)) {
+                  latestAssignments.teamB.push(socket.id);
+                  console.log(`➕ Added ${effectiveUsername} (${socket.id}) to teamB`);
+                }
+              }
+              await redisService.setTeamAssignments(roomId, latestAssignments);
+              teamAssignments = latestAssignments;
+              console.log(
+                `✅ Assigned ${effectiveUsername} (${socket.id}) to ${myTeamId}. New assignments:`,
+                teamAssignments,
+              );
+            }
+          }
+
+          // Determine team members
+          const teamAMembers = players.filter((p) => teamAssignments.teamA.includes(p.id));
+          const teamBMembers = players.filter((p) => teamAssignments.teamB.includes(p.id));
+
+          // Calculate team scores
+          const teamAScore = teamAMembers.reduce((sum, p) => sum + p.score, 0);
+          const teamBScore = teamBMembers.reduce((sum, p) => sum + p.score, 0);
+
+          const teams = [
+            {
+              teamId: 'teamA',
+              members: teamAMembers.map((p) => ({
+                id: p.id,
+                username: p.username,
+                avatar: p.avatar,
+              })),
+              score: teamAScore,
+              currentQuestionIndex: Math.max(...teamAMembers.map((p) => p.currentQuestionIndex), 0),
+              hasAnswered: false,
+            },
+            {
+              teamId: 'teamB',
+              members: teamBMembers.map((p) => ({
+                id: p.id,
+                username: p.username,
+                avatar: p.avatar,
+              })),
+              score: teamBScore,
+              currentQuestionIndex: Math.max(...teamBMembers.map((p) => p.currentQuestionIndex), 0),
+              hasAnswered: false,
+            },
+          ];
+
+          // Send team assignment to the newly joined player
+          socket.emit('team-assignment', { teamId: myTeamId, teams });
+
+          // Notify all players about updated teams
+          io.to(roomId).emit('teams-update', { teams, totalPlayers });
+
+          // Send system message
+          const systemMessage: ChatMessage = {
+            id: `${Date.now()}-${Math.random()}`,
+            username: 'System',
+            message: `${effectiveUsername} joined the custom room`,
+            timestamp: Date.now(),
+          };
+          await redisService.addChatMessage(roomId, systemMessage);
+          io.to(roomId).emit('chat-message', systemMessage);
+
+          console.log(`⚙️  ${effectiveUsername} joined custom room ${roomId} on ${myTeamId}`);
+        } catch (error) {
+          console.error('Error in join-custom-room:', error);
+          socket.emit('error', { message: 'Failed to join custom room' });
+        }
+      },
+    );
+
+    // Initialize custom mode
+    socket.on('custom:init', async (data: { roomId: string; quizId: string; duration: number }) => {
+      try {
+        const { roomId, quizId, duration } = data;
+        await redisService.updateRoomStatus(roomId, { gameStarted: true });
+
+        // Start countdown for custom mode
+        let countdown = 3;
+        const countdownInterval = setInterval(() => {
+          if (countdown > 0) {
+            io.to(roomId).emit('versus:countdown', countdown);
+            countdown--;
+          } else {
+            clearInterval(countdownInterval);
+            io.to(roomId).emit('quiz:start', { quizId, duration });
+            console.log(`⚙️  Custom battle started in room ${roomId}: ${quizId}`);
+          }
+        }, 1000);
+      } catch (error) {
+        console.error('Error in custom:init:', error);
+        socket.emit('error', { message: 'Failed to start custom battle' });
       }
     });
 

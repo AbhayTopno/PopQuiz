@@ -202,6 +202,10 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
         router.push(
           `/cooparena?roomId=${roomId}&quizId=${payload.quizId}&duration=${payload.duration}&username=${username}`,
         );
+      } else if (mode === 'custom') {
+        router.push(
+          `/customarena?roomId=${roomId}&quizId=${payload.quizId}&duration=${payload.duration}&username=${username}`,
+        );
       } else {
         router.push(`/quiz/${payload.quizId}?duration=${payload.duration}`);
       }
@@ -414,6 +418,8 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
         socket.emit('2v2:init', { roomId, quizId: data.quizId, duration: settings.duration });
       } else if (mode === 'coop') {
         socket.emit('coop:init', { roomId, quizId: data.quizId, duration: settings.duration });
+      } else if (mode === 'custom') {
+        socket.emit('custom:init', { roomId, quizId: data.quizId, duration: settings.duration });
       } else {
         socket.emit('quiz:start', { roomId, quizId: data.quizId, duration: settings.duration });
       }
@@ -469,9 +475,9 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     });
   };
 
-  // Auto-assign players by default (alternating)
+  // Auto-assign players by default (alternating) for 2v2 and custom modes
   useEffect(() => {
-    if (mode !== '2v2' || !isHost) return;
+    if ((mode !== '2v2' && mode !== 'custom') || !isHost) return;
 
     const unassignedPlayers = players.filter(
       (p) => !teamAssignments.teamA.includes(p.id) && !teamAssignments.teamB.includes(p.id),
@@ -558,7 +564,9 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
             ? '1v1 Waiting Room'
             : mode === '2v2'
               ? '2v2 Waiting Room'
-              : 'Co-op Waiting Room'}
+              : mode === 'custom'
+                ? 'Custom Battle Waiting Room'
+                : 'Co-op Waiting Room'}
         </h1>
         <div className="flex items-center gap-2">
           <button
@@ -589,7 +597,9 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                   ? '(4 max)'
                   : mode === 'coop'
                     ? '(2-10 players)'
-                    : ''}
+                    : mode === 'custom'
+                      ? '(2-10 players, any team composition)'
+                      : ''}
             </div>
             <div className="mb-4 flex flex-wrap gap-2 overflow-auto max-h-24">
               {players.map((p, i) => (
@@ -612,6 +622,11 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
               )}
               {mode === '2v2' && players.length === 4 && (
                 <span className="text-xs text-green-400">All players are here.</span>
+              )}
+              {mode === 'custom' && players.length >= 2 && players.length <= 10 && (
+                <span className="text-xs text-cyan-400">
+                  {players.length} players ready for custom battle
+                </span>
               )}
             </div>
 
@@ -699,11 +714,14 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 </div>
               </div>
 
-              {/* Team Management for 2v2 */}
-              {mode === '2v2' && (
+              {/* Team Management for 2v2 and Custom */}
+              {(mode === '2v2' || mode === 'custom') && (
                 <div>
                   <label className="mb-2 block text-sm text-white/80 font-semibold">
                     Team Assignments {isHost && '(Drag & Drop or Click)'}
+                    {mode === 'custom' && (
+                      <span className="text-xs text-cyan-400 ml-2">(Custom: Any team size)</span>
+                    )}
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     {/* Team A */}
@@ -942,7 +960,11 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     (mode === '1v1' && players.length < 2) ||
                     (mode === '2v2' &&
                       (teamAssignments.teamA.length !== 2 || teamAssignments.teamB.length !== 2)) ||
-                    (mode === 'coop' && players.length < 2)
+                    (mode === 'coop' && players.length < 2) ||
+                    (mode === 'custom' &&
+                      (teamAssignments.teamA.length === 0 ||
+                        teamAssignments.teamB.length === 0 ||
+                        players.length < 2))
                   }
                   className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
@@ -956,6 +978,12 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                   (teamAssignments.teamA.length !== 2 || teamAssignments.teamB.length !== 2) && (
                     <p className="mt-2 text-xs text-yellow-400 text-center">
                       Each team needs exactly 2 players to start
+                    </p>
+                  )}
+                {mode === 'custom' &&
+                  (teamAssignments.teamA.length === 0 || teamAssignments.teamB.length === 0) && (
+                    <p className="mt-2 text-xs text-yellow-400 text-center">
+                      Both teams need at least 1 player to start
                     </p>
                   )}
                 {mode === 'coop' && players.length < 2 && (
@@ -1013,11 +1041,16 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 </div>
               </div>
 
-              {/* Team Management for 2v2 in Mobile */}
-              {mode === '2v2' && (
+              {/* Team Management for 2v2 and Custom in Mobile */}
+              {(mode === '2v2' || mode === 'custom') && (
                 <div>
                   <label className="mb-2 block text-sm text-white/80 font-semibold">
                     Team Assignments {isHost && '(Drag & Drop or Click)'}
+                    {mode === 'custom' && (
+                      <span className="text-xs text-cyan-400 block mt-1">
+                        (Custom: Any team size up to 10 players)
+                      </span>
+                    )}
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     {/* Team A */}
@@ -1251,7 +1284,11 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                       (mode === '2v2' &&
                         (teamAssignments.teamA.length !== 2 ||
                           teamAssignments.teamB.length !== 2)) ||
-                      (mode === 'coop' && players.length < 2)
+                      (mode === 'coop' && players.length < 2) ||
+                      (mode === 'custom' &&
+                        (teamAssignments.teamA.length === 0 ||
+                          teamAssignments.teamB.length === 0 ||
+                          players.length < 2))
                     }
                     className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -1265,6 +1302,12 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     (teamAssignments.teamA.length !== 2 || teamAssignments.teamB.length !== 2) && (
                       <p className="mt-2 text-xs text-yellow-400 text-center">
                         Each team needs exactly 2 players to start
+                      </p>
+                    )}
+                  {mode === 'custom' &&
+                    (teamAssignments.teamA.length === 0 || teamAssignments.teamB.length === 0) && (
+                      <p className="mt-2 text-xs text-yellow-400 text-center">
+                        Both teams need at least 1 player to start
                       </p>
                     )}
                   {mode === 'coop' && players.length < 2 && (

@@ -137,7 +137,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
       const result = await response.json();
 
       if (result.quizId) {
-        // If 1v1, 2v2, coop, or multiplayer mode, go to waiting room
+        // If 1v1, 2v2, coop, custom, or multiplayer mode, go to waiting room
         if (
           battleType === '1v1' ||
           battleType === '2v2' ||
