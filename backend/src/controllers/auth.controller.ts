@@ -82,7 +82,17 @@ const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
   res.json(users);
 });
 
-const getCurrentUser = asyncHandler(async (req: any, res: Response) => {
+interface AuthRequest extends Request {
+  user?: {
+    _id: string;
+    username: string;
+    email: string;
+    isAdmin: boolean;
+    profilePic?: string;
+  };
+}
+
+const getCurrentUser = asyncHandler(async (req: AuthRequest, res: Response) => {
   // req.user is attached by the protect middleware
   if (req.user) {
     res.json({

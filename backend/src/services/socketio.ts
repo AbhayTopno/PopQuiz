@@ -1039,8 +1039,28 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           const teamAMembers = allPlayers.filter((p) => teamAssignments.teamA.includes(p.id));
           const teamBMembers = allPlayers.filter((p) => teamAssignments.teamB.includes(p.id));
 
-          const teamAFinished = teamAMembers.every((p) => p.isReady);
-          const teamBFinished = teamBMembers.every((p) => p.isReady);
+          console.log(`🔍 Checking if both teams finished:`);
+          console.log(
+            `   Team A members: ${teamAMembers.length} (${teamAMembers.map((p) => p.username).join(', ')})`,
+          );
+          console.log(
+            `   Team A ready: ${teamAMembers.map((p) => `${p.username}:${p.isReady}`).join(', ')}`,
+          );
+          console.log(
+            `   Team B members: ${teamBMembers.length} (${teamBMembers.map((p) => p.username).join(', ')})`,
+          );
+          console.log(
+            `   Team B ready: ${teamBMembers.map((p) => `${p.username}:${p.isReady}`).join(', ')}`,
+          );
+          console.log(
+            `   All players in room: ${allPlayers.length} (${allPlayers.map((p) => p.username).join(', ')})`,
+          );
+          console.log(`   Team assignments:`, teamAssignments);
+
+          const teamAFinished = teamAMembers.length > 0 && teamAMembers.every((p) => p.isReady);
+          const teamBFinished = teamBMembers.length > 0 && teamBMembers.every((p) => p.isReady);
+
+          console.log(`   Team A finished: ${teamAFinished}, Team B finished: ${teamBFinished}`);
 
           if (teamAFinished && teamBFinished) {
             const teamAScore = teamAMembers.reduce((sum, p) => sum + p.score, 0);
@@ -1124,7 +1144,7 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
       'join-coop-room',
       async (data: { roomId: string; quizId: string; username?: string; avatar?: string }) => {
         try {
-          const { roomId, quizId } = data;
+          const { roomId } = data;
           const payloadUsername = (data.username ?? '').trim();
           const payloadAvatar = data.avatar;
 
@@ -1146,7 +1166,9 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           const members = existingMembers ? JSON.parse(existingMembers) : [];
 
           // Check if player already in team
-          const existingMemberIndex = members.findIndex((m: any) => m.id === socket.id);
+          const existingMemberIndex = members.findIndex(
+            (m: { id: string; username: string; avatar?: string }) => m.id === socket.id,
+          );
           if (existingMemberIndex === -1) {
             members.push({
               id: socket.id,
@@ -1190,7 +1212,9 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           const coopMembersKey = `coop:${roomId}:members`;
           const membersData = await getCoopData(coopMembersKey);
           const members = membersData ? JSON.parse(membersData) : [];
-          const answeringPlayer = members.find((m: any) => m.id === socket.id);
+          const answeringPlayer = members.find(
+            (m: { id: string; username: string; avatar?: string }) => m.id === socket.id,
+          );
           const playerName = answeringPlayer?.username || 'Someone';
 
           // Lock all players immediately and send answer info

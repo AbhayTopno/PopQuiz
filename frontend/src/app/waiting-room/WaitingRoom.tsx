@@ -469,22 +469,6 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     });
   };
 
-  const removePlayerFromTeam = (playerId: string) => {
-    if (!isHost) return;
-
-    setTeamAssignments((prev) => {
-      const newAssignments = {
-        teamA: prev.teamA.filter((id) => id !== playerId),
-        teamB: prev.teamB.filter((id) => id !== playerId),
-      };
-
-      // Emit to server
-      socket.emit('update-team-assignments', { roomId, teamAssignments: newAssignments });
-
-      return newAssignments;
-    });
-  };
-
   // Auto-assign players by default (alternating)
   useEffect(() => {
     if (mode !== '2v2' || !isHost) return;
