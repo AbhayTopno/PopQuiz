@@ -18,7 +18,7 @@ router.post('/login', authLimiter, login);
 router.post('/logout', logout);
 
 // Protected routes with general API rate limiting
-router.get('/me', protect, apiLimiter, getCurrentUser);
+router.get('/me', apiLimiter, protect, getCurrentUser);
 router.get('/getUser/:id', apiLimiter, getUserById);
 router.get('/getAllUsers', apiLimiter, getAllUsers);
 
