@@ -916,7 +916,7 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
       'submit-team-answer',
       async (data: {
         roomId: string;
-        teamId: string;
+        teamId: 'teamA' | 'teamB';
         answer: string | null;
         isCorrect: boolean;
         points: number;
@@ -993,7 +993,7 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     );
 
     // Team finished quiz (individual player finishes)
-    socket.on('team-quiz-finished', async (data: { roomId: string; teamId: string }) => {
+    socket.on('team-quiz-finished', async (data: { roomId: string; teamId: 'teamA' | 'teamB' }) => {
       try {
         const { roomId, teamId } = data;
 
