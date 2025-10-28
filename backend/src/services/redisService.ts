@@ -438,3 +438,42 @@ export const getTeamAssignments = async (
     return null;
   }
 };
+
+/**
+ * Set team score (shared score for the whole team)
+ */
+export const setTeamScore = async (
+  roomId: string,
+  teamId: 'teamA' | 'teamB',
+  score: number,
+): Promise<void> => {
+  const redis = getRedisClient();
+  const teamScoreKey = `team-score:${roomId}:${teamId}`;
+  await redis.set(teamScoreKey, score.toString());
+  await redis.expire(teamScoreKey, ROOM_TTL);
+};
+
+/**
+ * Get team score (shared score for the whole team)
+ */
+export const getTeamScore = async (roomId: string, teamId: 'teamA' | 'teamB'): Promise<number> => {
+  const redis = getRedisClient();
+  const teamScoreKey = `team-score:${roomId}:${teamId}`;
+  const score = await redis.get(teamScoreKey);
+  return score ? parseInt(score, 10) : 0;
+};
+
+/**
+ * Increment team score (add points to shared team score)
+ */
+export const incrementTeamScore = async (
+  roomId: string,
+  teamId: 'teamA' | 'teamB',
+  points: number,
+): Promise<number> => {
+  const redis = getRedisClient();
+  const teamScoreKey = `team-score:${roomId}:${teamId}`;
+  const newScore = await redis.incrby(teamScoreKey, points);
+  await redis.expire(teamScoreKey, ROOM_TTL);
+  return newScore;
+};
