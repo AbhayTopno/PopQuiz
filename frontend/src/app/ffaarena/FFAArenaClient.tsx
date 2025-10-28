@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { QuizData } from '@/types';
 import { getSocket } from '@/utils/socket';
 import { calculateScore, type Difficulty } from '@/utils/scoring';
+import CompactLeaderboard, { type CompactPlayer } from '@/components/CompactLeaderboard';
+import TimerBar from '@/components/TimerBar';
 
 type FFAPlayer = {
   id: string;
@@ -270,7 +272,6 @@ export default function FFAArenaClient() {
   }
 
   const currentQuestion = quizData.questions[currentQuestionIndex];
-  const timePercentage = (timeLeft / duration) * 100;
   const isTimeLow = timeLeft <= 5;
 
   if (isFinished) {
@@ -395,48 +396,8 @@ export default function FFAArenaClient() {
 
   return (
     <div className="flex flex-col h-screen p-2 md:p-4 overflow-hidden" style={backgroundStyle}>
-      {/* Compact Leaderboard */}
-      <div className="w-full max-w-4xl mx-auto mb-3">
-        <div className="bg-black/50 rounded-xl border border-cyan-400/40 px-4 py-3 backdrop-blur-md shadow-lg">
-          <div className="flex flex-wrap gap-x-6 gap-y-2 items-center justify-center text-sm">
-            {sortedPlayers.map((player, index) => {
-              const isMe = player.id === socket.id;
-              const rank = index + 1;
-
-              // Determine medal emoji
-              let medal = '';
-              let rankColor = 'text-white/70';
-
-              if (rank === 1) {
-                medal = '🥇';
-                rankColor = 'text-yellow-400';
-              } else if (rank === 2) {
-                medal = '🥈';
-                rankColor = 'text-gray-300';
-              } else if (rank === 3) {
-                medal = '🥉';
-                rankColor = 'text-orange-400';
-              }
-
-              return (
-                <div
-                  key={player.id}
-                  className={`flex items-center gap-2 ${isMe ? 'text-cyan-300 font-semibold' : 'text-white/90'}`}
-                >
-                  <span className={`font-zentry text-base ${rankColor}`}>
-                    {medal || `#${rank}`}
-                  </span>
-                  <span className="font-general truncate max-w-[100px]">
-                    {player.username}
-                    {player.finished && ' ✓'}
-                  </span>
-                  <span className="font-zentry font-bold text-base">{player.score}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      {/* Compact Leaderboard (reusable) */}
+      <CompactLeaderboard players={sortedPlayers as CompactPlayer[]} socketId={socket.id} />
 
       <div
         className={`w-full max-w-4xl mx-auto flex-1 flex flex-col transition-opacity duration-300 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
@@ -458,34 +419,13 @@ export default function FFAArenaClient() {
 
         {/* Main Card */}
         <div className="bg-black/50 rounded-2xl border-2 border-cyan-400/30 p-4 md:p-6 shadow-2xl backdrop-blur-md flex flex-col">
-          {/* Timer Bar */}
-          <div className="mb-4 flex items-center gap-3">
-            <div
-              className="flex-1 relative h-3 bg-gray-700/50 rounded-full overflow-hidden"
-              role="progressbar"
-              aria-valuenow={timeLeft}
-              aria-valuemin={0}
-              aria-valuemax={duration}
-              aria-label="Time remaining"
-            >
-              <div
-                className={`absolute left-0 top-0 h-full ${isTimeLow ? 'bg-red-500' : 'bg-cyan-400'} transition-all duration-1000 ease-linear`}
-                style={{
-                  width: `${Math.max(0, Math.min(100, timePercentage))}%`,
-                }}
-                onTransitionEnd={handleProgressTransitionEnd}
-              />
-            </div>
-            <div
-              className={`min-w-[60px] px-3 py-1 rounded-lg text-sm font-mono text-center border ${
-                isTimeLow
-                  ? 'bg-red-500/20 text-red-200 border-red-500/40'
-                  : 'bg-black/60 text-white border-cyan-400/30'
-              }`}
-            >
-              {timeLeft}s
-            </div>
-          </div>
+          {/* Timer Bar (reusable) */}
+          <TimerBar
+            timeLeft={timeLeft}
+            duration={duration}
+            isTimeLow={isTimeLow}
+            onTransitionEnd={handleProgressTransitionEnd}
+          />
 
           <h2 className="font-general text-base md:text-lg mb-3 font-bold text-white text-center">
             {currentQuestion.questionText}
