@@ -206,6 +206,10 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
         router.push(
           `/customarena?roomId=${roomId}&quizId=${payload.quizId}&duration=${payload.duration}&username=${username}`,
         );
+      } else if (mode === 'ffa') {
+        router.push(
+          `/ffaarena?roomId=${roomId}&quizId=${payload.quizId}&duration=${payload.duration}&username=${username}`,
+        );
       } else {
         router.push(`/quiz/${payload.quizId}?duration=${payload.duration}`);
       }
@@ -289,6 +293,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     socket.on('room:full', handleRoomFull);
     socket.on('versus:countdown', handleCountdown);
     socket.on('coop:countdown', handleCountdown);
+    socket.on('ffa:countdown', handleCountdown);
     socket.on('player-kicked', handlePlayerKicked);
 
     return () => {
@@ -305,6 +310,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       socket.off('room:full', handleRoomFull);
       socket.off('versus:countdown', handleCountdown);
       socket.off('coop:countdown', handleCountdown);
+      socket.off('ffa:countdown', handleCountdown);
       socket.off('player-kicked', handlePlayerKicked);
     };
   }, [socket, router, isHost, mode, roomId, username]);
@@ -393,9 +399,31 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
   };
 
   const handleLetsGo = async () => {
-    if (!settings.topic.trim()) return;
+    if (!settings.topic.trim()) {
+      alert('Please enter a quiz topic');
+      return;
+    }
     setIsGenerating(true);
     try {
+      // If quizId already exists (user joined an existing room), use it directly
+      if (quizId && quizId !== 'new') {
+        if (mode === '1v1') {
+          socket.emit('versus:init', { roomId, quizId, duration: settings.duration });
+        } else if (mode === '2v2') {
+          socket.emit('2v2:init', { roomId, quizId, duration: settings.duration });
+        } else if (mode === 'coop') {
+          socket.emit('coop:init', { roomId, quizId, duration: settings.duration });
+        } else if (mode === 'custom') {
+          socket.emit('custom:init', { roomId, quizId, duration: settings.duration });
+        } else if (mode === 'ffa') {
+          socket.emit('ffa:init', { roomId, quizId, duration: settings.duration });
+        } else {
+          socket.emit('quiz:start', { roomId, quizId, duration: settings.duration });
+        }
+        return;
+      }
+
+      // Generate new quiz
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quiz/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -405,12 +433,23 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
           count: settings.count,
         }),
       });
+
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        throw new Error(e.message || 'Failed to generate quiz');
+        const errorMsg = e.message || `Failed to generate quiz (${res.status})`;
+        console.error('Quiz generation failed:', errorMsg);
+        alert(errorMsg);
+        throw new Error(errorMsg);
       }
+
       const data = await res.json();
-      if (!data.quizId) throw new Error('No quiz ID');
+
+      if (!data.quizId) {
+        const errorMsg = 'No quiz ID returned from server';
+        console.error(errorMsg);
+        alert(errorMsg);
+        throw new Error(errorMsg);
+      }
 
       if (mode === '1v1') {
         socket.emit('versus:init', { roomId, quizId: data.quizId, duration: settings.duration });
@@ -420,11 +459,16 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
         socket.emit('coop:init', { roomId, quizId: data.quizId, duration: settings.duration });
       } else if (mode === 'custom') {
         socket.emit('custom:init', { roomId, quizId: data.quizId, duration: settings.duration });
+      } else if (mode === 'ffa') {
+        socket.emit('ffa:init', { roomId, quizId: data.quizId, duration: settings.duration });
       } else {
         socket.emit('quiz:start', { roomId, quizId: data.quizId, duration: settings.duration });
       }
     } catch (e) {
-      console.error(e);
+      console.error('Error in handleLetsGo:', e);
+      if (e instanceof Error) {
+        alert(`Error: ${e.message}`);
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -566,7 +610,9 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
               ? '2v2 Waiting Room'
               : mode === 'custom'
                 ? 'Custom Battle Waiting Room'
-                : 'Co-op Waiting Room'}
+                : mode === 'ffa'
+                  ? 'FFA Waiting Room'
+                  : 'Co-op Waiting Room'}
         </h1>
         <div className="flex items-center gap-2">
           <button
@@ -599,7 +645,9 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     ? '(2-10 players)'
                     : mode === 'custom'
                       ? '(2-10 players, any team composition)'
-                      : ''}
+                      : mode === 'ffa'
+                        ? '(2-10 players, free-for-all)'
+                        : ''}
             </div>
             <div className="mb-4 flex flex-wrap gap-2 overflow-auto max-h-24">
               {players.map((p, i) => (
@@ -626,6 +674,11 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
               {mode === 'custom' && players.length >= 2 && players.length <= 10 && (
                 <span className="text-xs text-cyan-400">
                   {players.length} players ready for custom battle
+                </span>
+              )}
+              {mode === 'ffa' && players.length >= 2 && players.length <= 10 && (
+                <span className="text-xs text-yellow-400">
+                  {players.length} players ready for FFA battle
                 </span>
               )}
             </div>
@@ -964,7 +1017,8 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     (mode === 'custom' &&
                       (teamAssignments.teamA.length === 0 ||
                         teamAssignments.teamB.length === 0 ||
-                        players.length < 2))
+                        players.length < 2)) ||
+                    (mode === 'ffa' && (players.length < 2 || players.length > 10))
                   }
                   className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
@@ -988,7 +1042,12 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                   )}
                 {mode === 'coop' && players.length < 2 && (
                   <p className="mt-2 text-xs text-yellow-400 text-center">
-                    Minimum 2 players required to start co-op
+                    Need at least 2 players to start
+                  </p>
+                )}
+                {mode === 'ffa' && (players.length < 2 || players.length > 10) && (
+                  <p className="mt-2 text-xs text-yellow-400 text-center">
+                    Need 2-10 players for FFA battle
                   </p>
                 )}
               </div>
@@ -1288,7 +1347,8 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                       (mode === 'custom' &&
                         (teamAssignments.teamA.length === 0 ||
                           teamAssignments.teamB.length === 0 ||
-                          players.length < 2))
+                          players.length < 2)) ||
+                      (mode === 'ffa' && (players.length < 2 || players.length > 10))
                     }
                     className="w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-semibold uppercase hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -1312,7 +1372,12 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                     )}
                   {mode === 'coop' && players.length < 2 && (
                     <p className="mt-2 text-xs text-yellow-400 text-center">
-                      Minimum 2 players required to start co-op
+                      Need at least 2 players to start
+                    </p>
+                  )}
+                  {mode === 'ffa' && (players.length < 2 || players.length > 10) && (
+                    <p className="mt-2 text-xs text-yellow-400 text-center">
+                      Need 2-10 players for FFA battle
                     </p>
                   )}
                 </div>

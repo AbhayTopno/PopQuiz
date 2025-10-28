@@ -59,7 +59,11 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           const room = await redisService.getRoom(roomId);
           const roomMode = room?.mode || mode || '1v1';
           const maxCapacity =
-            roomMode === '2v2' ? 4 : roomMode === 'coop' || roomMode === 'custom' ? 10 : 2;
+            roomMode === '2v2'
+              ? 4
+              : roomMode === 'coop' || roomMode === 'custom' || roomMode === 'ffa'
+                ? 10
+                : 2;
 
           if (currentPlayerCount >= maxCapacity) {
             socket.emit('room:full', {
@@ -1548,6 +1552,216 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
       } catch (error) {
         console.error('Error in coop:init:', error);
         socket.emit('error', { message: 'Failed to start co-op quiz' });
+      }
+    });
+
+    // ========================================
+    // FFA (Free-For-All) Mode Handlers
+    // ========================================
+
+    // FFA: Join room
+    socket.on(
+      'join-ffa-room',
+      async (data: { roomId: string; quizId: string; username: string }) => {
+        try {
+          const { roomId, username } = data;
+
+          // Add player to Redis if not already there
+          const existingPlayer = await redisService.getPlayer(roomId, socket.id);
+          if (!existingPlayer) {
+            const player = {
+              id: socket.id,
+              username: username || 'Player',
+              score: 0,
+              currentQuestionIndex: 0,
+              answers: [],
+              isReady: false,
+              joinedAt: Date.now(),
+            };
+            await redisService.addPlayer(roomId, player);
+            console.log(`🎮 ${username} joined FFA room ${roomId}`);
+          }
+
+          // Join socket room
+          socket.join(roomId);
+
+          // Send current player list
+          const players = await redisService.getAllPlayers(roomId);
+          const playerList = players
+            .map((p) => ({
+              id: p.id,
+              username: p.username,
+              avatar: p.avatar,
+              score: p.score || 0,
+              finished: p.isReady || false,
+            }))
+            .sort((a, b) => b.score - a.score);
+
+          // Send to the player who just joined
+          socket.emit('ffa-players-update', { players: playerList });
+
+          // Notify all players in room about updated player list
+          io.to(roomId).emit('ffa-players-update', { players: playerList });
+        } catch (error) {
+          console.error('Error in join-ffa-room:', error);
+          socket.emit('error', { message: 'Failed to join FFA room' });
+        }
+      },
+    );
+
+    socket.on('ffa:init', async (data: { roomId: string; quizId: string; duration: number }) => {
+      try {
+        const { roomId, quizId, duration } = data;
+        await redisService.updateRoomStatus(roomId, { gameStarted: true });
+
+        // Start countdown for FFA mode
+        let countdown = 3;
+        const countdownInterval = setInterval(() => {
+          if (countdown > 0) {
+            io.to(roomId).emit('ffa:countdown', countdown);
+            countdown--;
+          } else {
+            clearInterval(countdownInterval);
+            io.to(roomId).emit('quiz:start', { quizId, duration });
+            console.log(`🎮 FFA battle started in room ${roomId}: ${quizId}`);
+          }
+        }, 1000);
+      } catch (error) {
+        console.error('Error in ffa:init:', error);
+        socket.emit('error', { message: 'Failed to start FFA battle' });
+      }
+    });
+
+    // FFA: Score update during battle
+    socket.on(
+      'ffa-score-update',
+      async (data: {
+        roomId: string;
+        score: number;
+        currentQuestion: number;
+        finished: boolean;
+      }) => {
+        try {
+          const { roomId, score, currentQuestion, finished } = data;
+          let player = await redisService.getPlayer(roomId, socket.id);
+
+          if (!player) {
+            console.log(
+              `⚠️  Player not found in Redis during ffa-score-update, adding now... (${socket.id})`,
+            );
+            const username = 'Player'; // Fallback
+            player = {
+              id: socket.id,
+              username,
+              score: 0,
+              currentQuestionIndex: 0,
+              answers: [],
+              isReady: false,
+              joinedAt: Date.now(),
+            };
+            await redisService.addPlayer(roomId, player);
+          }
+
+          // Update player score in Redis
+          await redisService.updatePlayer(roomId, socket.id, {
+            score,
+            currentQuestionIndex: currentQuestion,
+          });
+
+          // Broadcast score update to ALL players in the room
+          const scoreUpdateData = {
+            playerId: socket.id,
+            username: player.username,
+            score,
+            currentQuestion,
+            finished,
+          };
+
+          // Emit to everyone in the room for real-time leaderboard
+          io.to(roomId).emit('ffa-score-update', scoreUpdateData);
+
+          console.log(
+            `📊 FFA Score synced: ${player.username} - ${score} pts (Q${currentQuestion}) → Room ${roomId}`,
+          );
+        } catch (error) {
+          console.error('Error in ffa-score-update:', error);
+        }
+      },
+    );
+
+    // FFA: Player finished quiz
+    socket.on(
+      'ffa-player-finished',
+      async (data: { roomId: string; username: string; score: number }) => {
+        try {
+          const { roomId, username, score } = data;
+
+          // Mark player as finished
+          await redisService.updatePlayer(roomId, socket.id, {
+            score,
+            isReady: true, // Reusing isReady to mean "finished"
+          });
+
+          // Notify all other players that this player finished
+          socket.to(roomId).emit('ffa-player-finished', {
+            playerId: socket.id,
+            username,
+            score,
+          });
+
+          console.log(`✅ ${username} finished FFA in room ${roomId} with ${score} points`);
+
+          // Check if all players finished
+          const players = await redisService.getAllPlayers(roomId);
+          const allFinished = players.every((p) => p.isReady);
+
+          if (allFinished && players.length >= 2) {
+            // Sort players by score (descending)
+            const sortedPlayers = players
+              .map((p) => ({
+                id: p.id,
+                username: p.username,
+                score: p.score,
+                finished: true,
+              }))
+              .sort((a, b) => b.score - a.score);
+
+            // Battle complete - send final rankings to all
+            io.to(roomId).emit('ffa-battle-complete', {
+              players: sortedPlayers,
+            });
+
+            console.log(`🎮 FFA Battle completed in room ${roomId}`);
+          }
+        } catch (error) {
+          console.error('Error in ffa-player-finished:', error);
+        }
+      },
+    );
+
+    // FFA: Get players list with scores
+    socket.on('ffa-get-players', async (data: { roomId: string }) => {
+      try {
+        const { roomId } = data;
+        const roomExists = await redisService.roomExists(roomId);
+
+        if (roomExists) {
+          const players = await redisService.getAllPlayers(roomId);
+
+          const playerList = players
+            .map((p) => ({
+              id: p.id,
+              username: p.username,
+              avatar: p.avatar,
+              score: p.score,
+              finished: p.isReady || false,
+            }))
+            .sort((a, b) => b.score - a.score);
+
+          socket.emit('ffa-players-update', { players: playerList });
+        }
+      } catch (error) {
+        console.error('Error in ffa-get-players:', error);
       }
     });
   });
