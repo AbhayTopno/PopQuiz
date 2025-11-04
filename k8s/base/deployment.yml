@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: popquiz-backend
-          image: abhaytopno/popquiz-backend:v1.1
+          image: abhaytopno/popquiz-backend:v2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5000
@@ -55,7 +55,7 @@ spec:
     spec:
       containers:
         - name: popquiz-frontend
-          image: abhaytopno/popquiz-frontend:v1.1
+          image: abhaytopno/popquiz-frontend:v2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000

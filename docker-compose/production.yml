@@ -2,7 +2,7 @@
 services:
   backend:
     container_name: production_backend
-    image: abhaytopno/popquiz-backend:v1.1
+    image: abhaytopno/popquiz-backend:v2
     restart: unless-stopped
     env_file:
       - ../backend/.env
@@ -17,7 +17,7 @@ services:
 
   frontend:
     container_name: production_frontend
-    image: abhaytopno/popquiz-frontend:v1.1
+    image: abhaytopno/popquiz-frontend:v2
     restart: unless-stopped
     env_file:
       - ../frontend/.env
