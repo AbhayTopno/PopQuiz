@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: popquiz-backend
-          image: abhaytopno/popquiz-backend:v1.1 # Current image version
+          image: abhaytopno/popquiz-backend:v2
           ports:
             - containerPort: 5000
           envFrom:
@@ -55,7 +55,7 @@ spec:
     spec:
       containers:
         - name: popquiz-frontend
-          image: abhaytopno/popquiz-frontend:v1.1 # Current image version
+          image: abhaytopno/popquiz-frontend:v2
           ports:
             - containerPort: 3000
           envFrom:
