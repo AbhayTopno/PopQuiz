@@ -14,9 +14,6 @@ COPY . .
 # This will now correctly generate the /dist folder
 RUN pnpm run build
 
-# Strip out development-only dependencies before packaging runtime image
-RUN pnpm prune --prod
-
 # -------------------------
 # Production Runtime
 # -------------------------
