@@ -7,6 +7,7 @@ import { getSocket } from '@/utils/socket';
 import { calculateScore, type Difficulty } from '@/utils/scoring';
 import CompactLeaderboard, { type CompactPlayer } from '@/components/CompactLeaderboard';
 import TimerBar from '@/components/TimerBar';
+import { getApiUrl } from '@/lib/config';
 
 type FFAPlayer = {
   id: string;
@@ -51,7 +52,7 @@ export default function FFAArenaClient() {
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quiz/${quizId}`);
+        const response = await fetch(`${getApiUrl()}/api/quiz/${quizId}`);
         if (!response.ok) throw new Error('Failed to fetch quiz');
         const data = await response.json();
         setQuizData(data);

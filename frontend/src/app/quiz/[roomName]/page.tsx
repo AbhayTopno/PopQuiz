@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import QuizClient from './QuizClient';
 import Link from 'next/link';
 import { QuizData } from '@/types';
+import { getApiUrl } from '@/lib/config';
 
 // Force dynamic rendering (SSR) for this route
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export default async function QuizPage({ params, searchParams }: Props) {
   // CHANGE: Await searchParams to get the resolved object, since searchParams is now a Promise (handle as optional)
   const resolvedSearchParams = await searchParams;
 
-  const apiBase = process.env.NEXT_PUBLIC_DOCKER_BACKEND_API;
+  const apiBase = getApiUrl();
 
   if (!roomName) {
     return notFound();

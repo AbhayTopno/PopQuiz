@@ -1,10 +1,11 @@
 import { io, Socket } from 'socket.io-client';
+import { getSocketUrl } from '@/lib/config';
 
 let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
-    const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const url = getSocketUrl();
     socket = io(url, {
       autoConnect: false,
       withCredentials: true,

@@ -4,6 +4,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { useRouter } from 'next/navigation';
+import { getApiUrl } from '@/lib/config';
 
 interface QuizPopupProps {
   open: boolean;
@@ -123,7 +124,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
     };
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quiz/generate`, {
+      const response = await fetch(`${getApiUrl()}/api/quiz/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
