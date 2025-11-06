@@ -2,6 +2,48 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: redis
+  namespace: popquiz
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: '50m'
+              memory: '64Mi'
+            limits:
+              cpu: '200m'
+              memory: '256Mi'
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: popquiz-backend-deployment-stable
   namespace: popquiz
 spec:
@@ -20,6 +62,11 @@ spec:
           image: abhaytopno/popquiz-backend:v2
           ports:
             - containerPort: 5000
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /usr/src/app/.cache
           envFrom:
             - configMapRef:
                 name: frontend-config
@@ -34,6 +81,15 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -56,6 +112,11 @@ spec:
           image: abhaytopno/popquiz-frontend:v2
           ports:
             - containerPort: 3000
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nextjs-cache
+              mountPath: /app/.next/cache
           envFrom:
             - configMapRef:
                 name: frontend-config
@@ -70,3 +131,12 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextjs-cache
+          emptyDir: {}
