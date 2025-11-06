@@ -3,6 +3,7 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import Arena2v2Client from '@/app/2v2arena/ArenaClient';
 import { QuizData } from '@/types';
+import { getApiUrl } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export default async function Arena2v2Page({
 
   if (!roomId || !quizId) return notFound();
 
-  const apiBase = process.env.NEXT_PUBLIC_DOCKER_BACKEND_API;
+  const apiBase = getApiUrl();
   const res = await fetch(`${apiBase}/api/quiz/${encodeURIComponent(quizId)}`, {
     cache: 'no-store',
   });

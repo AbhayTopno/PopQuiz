@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import CoopArenaClient from './CoopArenaClient';
+import { getApiUrl } from '@/lib/config';
 
 export const metadata: Metadata = {
   title: 'Co-op Arena | PopQuiz',
@@ -15,7 +16,7 @@ type SearchParams = Promise<{
 
 async function fetchQuizData(quizId: string) {
   try {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    const baseURL = getApiUrl();
     const res = await fetch(`${baseURL}/api/quiz/${quizId}`, {
       next: { revalidate: 0 },
     });

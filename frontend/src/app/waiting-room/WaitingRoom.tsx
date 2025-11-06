@@ -13,6 +13,7 @@ import SettingsDrawer from '@/components/waiting-room/SettingsDrawer';
 import CountdownOverlay from '@/components/waiting-room/CountdownOverlay';
 import KickConfirmModal from '@/components/waiting-room/KickConfirmModal';
 import KickedMessageModal from '@/components/waiting-room/KickedMessageModal';
+import { getApiUrl } from '@/lib/config';
 import type {
   WaitingRoomProps,
   WaitingRoomPlayer,
@@ -372,7 +373,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       }
 
       // Generate new quiz
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quiz/generate`, {
+      const res = await fetch(`${getApiUrl()}/api/quiz/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

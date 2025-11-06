@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { QuizData } from '@/types';
 import { getSocket } from '@/utils/socket';
 import { calculateScore, type Difficulty } from '@/utils/scoring';
+import { getApiUrl } from '@/lib/config';
 
 type TeamMember = {
   id: string;
@@ -61,7 +62,7 @@ export default function CustomArenaClient() {
   useEffect(() => {
     const fetchQuiz = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quiz/${quizId}`);
+        const response = await fetch(`${getApiUrl()}/api/quiz/${quizId}`);
         if (!response.ok) throw new Error('Failed to fetch quiz');
         const data = await response.json();
         setQuizData(data);

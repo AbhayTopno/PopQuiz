@@ -7,12 +7,6 @@ FROM node:22-alpine AS builder
 RUN apk add --no-cache git && npm install -g pnpm@latest
 WORKDIR /usr/src/app
 
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_DOCKER_BACKEND_API
-
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXT_PUBLIC_DOCKER_BACKEND_API=${NEXT_PUBLIC_DOCKER_BACKEND_API}
-
 # Install deps
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -26,12 +20,19 @@ RUN pnpm run build
 # --------------------
 FROM node:22-alpine AS production
 WORKDIR /usr/src/app
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates bash
 ENV NODE_ENV=production
 
+# Copy built app
 COPY --from=builder /usr/src/app/.next/standalone ./
 COPY --from=builder /usr/src/app/.next/static ./.next/static
 COPY --from=builder /usr/src/app/public ./public
 
+# Copy entrypoint script and fix line endings
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 3000
-CMD ["node", "server.js"]
+
+# Use entrypoint to inject runtime config
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/entrypoint.sh"]
