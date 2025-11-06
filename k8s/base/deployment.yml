@@ -120,9 +120,17 @@ spec:
               mountPath: /tmp
             - name: nextjs-cache
               mountPath: /app/.next/cache
-          envFrom:
-            - configMapRef:
-                name: frontend-config
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: PORT
+              value: '3000'
+            - name: API_URL
+              value: 'http://YOUR_CLUSTER_IP.nip.io'
+            - name: SOCKET_URL
+              value: 'http://YOUR_CLUSTER_IP.nip.io'
+            - name: INTERNAL_API_URL
+              value: 'http://popquiz-backend-service'
           resources:
             requests:
               cpu: '100m'

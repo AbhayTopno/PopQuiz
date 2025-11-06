@@ -22,6 +22,9 @@ spec:
           volumeMounts:
             - name: redis-data
               mountPath: /data
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
           resources:
             requests:
               cpu: '50m'
@@ -33,10 +36,14 @@ spec:
             runAsNonRoot: true
             runAsUser: 999
             readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
+      volumes:
+        - name: redis-data
+          emptyDir: {}
       volumes:
         - name: redis-data
           emptyDir: {}
@@ -69,6 +76,11 @@ spec:
               mountPath: /tmp
             - name: cache
               mountPath: /usr/src/app/.cache
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /usr/src/app/.cache
           envFrom:
             - secretRef:
                 name: backend-secrets
@@ -83,10 +95,16 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
       volumes:
         - name: tmp
           emptyDir: {}
@@ -120,9 +138,17 @@ spec:
               mountPath: /tmp
             - name: nextjs-cache
               mountPath: /app/.next/cache
-          envFrom:
-            - configMapRef:
-                name: frontend-config
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: PORT
+              value: '3000'
+            - name: API_URL
+              value: 'http://YOUR_CLUSTER_IP.nip.io'
+            - name: SOCKET_URL
+              value: 'http://YOUR_CLUSTER_IP.nip.io'
+            - name: INTERNAL_API_URL
+              value: 'http://popquiz-backend-service'
           resources:
             requests:
               cpu: '100m'
@@ -134,10 +160,16 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
                 - ALL
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextjs-cache
+          emptyDir: {}
       volumes:
         - name: tmp
           emptyDir: {}
