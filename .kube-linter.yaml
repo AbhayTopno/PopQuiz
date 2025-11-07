@@ -2,4 +2,4 @@ checks:
   exclude:
     - run-as-non-root
     - privileged-container
-  - no-read-only-root-fs
+    - no-read-only-root-fs
