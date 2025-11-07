@@ -18,12 +18,21 @@ spec:
       containers:
         - name: {{ .Values.backend.name }}
           image: {{ .Values.backend.image }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: {{ .Values.backend.port }}
           envFrom:
             - secretRef:
                 name: {{ .Values.backend.secretName }}
+          env:
+            - name: REDIS_URL
+              value: {{ .Values.backend.env.redisUrl | quote }}
+            - name: PORT
+              value: {{ .Values.backend.port | quote }}
+            - name: NODE_ENV
+              value: {{ .Values.backend.env.nodeEnv | quote }}
+            - name: NEXT_API
+              value: {{ .Values.backend.env.nextApi | quote }}
           resources:
             requests:
               cpu: {{ .Values.backend.resources.requests.cpu }}

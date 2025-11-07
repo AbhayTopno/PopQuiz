@@ -21,9 +21,17 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: {{ .Values.frontend.port }}
-          envFrom:
-            - configMapRef:
-                name: {{ .Values.frontend.configMapName }}
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.frontend.env.nodeEnv | quote }}
+            - name: PORT
+              value: {{ .Values.frontend.port | quote }}
+            - name: API_URL
+              value: {{ .Values.frontend.env.apiUrl | quote }}
+            - name: SOCKET_URL
+              value: {{ .Values.frontend.env.socketUrl | quote }}
+            - name: INTERNAL_API_URL
+              value: {{ .Values.frontend.env.internalApiUrl | quote }}
           resources:
             requests:
               cpu: {{ .Values.frontend.resources.requests.cpu }}
