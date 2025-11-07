@@ -5,25 +5,18 @@ metadata:
   namespace: popquiz
   annotations:
     kubernetes.io/ingress.class: 'nginx'
-    nginx.ingress.kubernetes.io/proxy-body-size: '10m'
-    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
-    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
-    # WebSocket support for Socket.IO
-    nginx.ingress.kubernetes.io/upstream-hash-by: '$http_upgrade'
+    cert-manager.io/cluster-issuer: 'letsencrypt-prod'
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - popquiz.local
+      secretName: popquiz.local-tls
   rules:
-    - host: YOUR_CLUSTER_IP.nip.io
+    - host: popquiz.local
       http:
         paths:
           - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: popquiz-backend-service
-                port:
-                  number: 80
-          - path: /socket.io
             pathType: Prefix
             backend:
               service:

@@ -19,6 +19,9 @@ spec:
           image: redis:7-alpine
           ports:
             - containerPort: 6379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
           resources:
             requests:
               cpu: '50m'
@@ -30,16 +33,21 @@ spec:
             runAsNonRoot: true
             runAsUser: 999
             readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: redis-data
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: popquiz-backend-deployment-stable
   namespace: popquiz
-  labels:
-    app: popquiz-backend
 spec:
-  replicas: 1
+  replicas: 3 # Stable version has more replicas
   selector:
     matchLabels:
       app: popquiz-backend
@@ -47,25 +55,21 @@ spec:
     metadata:
       labels:
         app: popquiz-backend
+        version: stable # Label for the service to select
     spec:
       containers:
         - name: popquiz-backend
-          image: abhaytopno/popquiz-backend:v4
-          imagePullPolicy: Always
+          image: abhaytopno/popquiz-backend:v2
           ports:
             - containerPort: 5000
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /usr/src/app/.cache
           envFrom:
-            - secretRef:
-                name: backend-secrets
-          env:
-            - name: REDIS_URL
-              value: 'redis://redis:6379'
-            - name: PORT
-              value: '5000'
-            - name: NODE_ENV
-              value: 'production'
-            - name: NEXT_API
-              value: 'https://YOUR_CLUSTER_IP.nip.io'
+            - configMapRef:
+                name: frontend-config
           resources:
             requests:
               cpu: '100m'
@@ -73,16 +77,27 @@ spec:
             limits:
               cpu: '500m'
               memory: '512Mi'
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: popquiz-frontend-deployment-stable
   namespace: popquiz
-  labels:
-    app: popquiz-frontend
 spec:
-  replicas: 1
+  replicas: 3 # Stable version has more replicas
   selector:
     matchLabels:
       app: popquiz-frontend
@@ -90,22 +105,27 @@ spec:
     metadata:
       labels:
         app: popquiz-frontend
+        version: stable # Label for the service to select
     spec:
       containers:
         - name: popquiz-frontend
-          image: abhaytopno/popquiz-frontend:v3
-          imagePullPolicy: IfNotPresent
+          image: abhaytopno/popquiz-frontend:v2
           ports:
             - containerPort: 3000
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nextjs-cache
+              mountPath: /app/.next/cache
           env:
             - name: NODE_ENV
               value: 'production'
             - name: PORT
               value: '3000'
             - name: API_URL
-              value: 'https://YOUR_CLUSTER_IP.nip.io'
+              value: 'http://YOUR_CLUSTER_IP.nip.io'
             - name: SOCKET_URL
-              value: 'https://YOUR_CLUSTER_IP.nip.io'
+              value: 'http://YOUR_CLUSTER_IP.nip.io'
             - name: INTERNAL_API_URL
               value: 'http://popquiz-backend-service'
           resources:
@@ -115,3 +135,16 @@ spec:
             limits:
               cpu: '500m'
               memory: '512Mi'
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextjs-cache
+          emptyDir: {}
