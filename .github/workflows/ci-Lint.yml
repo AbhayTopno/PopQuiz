@@ -17,12 +17,23 @@ jobs:
   # -----------------------------
   # Linting Stage
   # -----------------------------
-  frontend-lint:
-    name: Frontend Lint (ESLint / Prettier)
+  lint:
+    name: Lint — ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: frontend
+            working-directory: frontend
+            eslint_glob: 'src/**/*.{js,jsx,ts,tsx}'
+            prettier_glob: 'src/**/*.{js,jsx,ts,tsx,json,md,css,scss}'
+          - name: backend
+            working-directory: backend
+            eslint_glob: 'src/**/*.{js,ts}'
+            prettier_glob: 'src/**/*.{js,ts,json,md}'
     defaults:
       run:
-        working-directory: frontend
+        working-directory: ${{ matrix.working-directory }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -32,30 +43,10 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-          cache-dependency-path: 'frontend/pnpm-lock.yaml'
+          cache-dependency-path: '${{ matrix.working-directory }}/pnpm-lock.yaml'
       - run: pnpm install --frozen-lockfile || pnpm install
-      - run: pnpm eslint "src/**/*.{js,jsx,ts,tsx}" --max-warnings=0
-      - run: pnpm prettier --check "src/**/*.{js,jsx,ts,tsx,json,md,css,scss}"
-
-  backend-lint:
-    name: Backend Lint (ESLint / Prettier)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'pnpm'
-          cache-dependency-path: 'backend/pnpm-lock.yaml'
-      - run: pnpm install --frozen-lockfile || pnpm install
-      - run: pnpm eslint "src/**/*.{js,ts}" --max-warnings=0
-      - run: pnpm prettier --check "src/**/*.{js,ts,json,md}"
+      - run: pnpm eslint "${{ matrix.eslint_glob }}" --max-warnings=0
+      - run: pnpm prettier --check "${{ matrix.prettier_glob }}"
 
   # -----------------------------
   # Validation Stage
@@ -63,7 +54,7 @@ jobs:
   docker-validate:
     name: Dockerfile & Compose Validation
     runs-on: ubuntu-latest
-    needs: [frontend-lint, backend-lint]
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
       - name: Create dummy .env files from examples
@@ -128,7 +119,7 @@ jobs:
   secret-scan:
     name: Detect Hardcoded Secrets
     runs-on: ubuntu-latest
-    needs: [frontend-lint, backend-lint]
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,37 +130,30 @@ jobs:
           path: .
           extra_args: --regex --entropy --json
 
-  frontend-trivy:
-    name: Frontend Trivy Image Scan
+  trivy-image-scan:
+    name: Trivy Image Scan — ${{ matrix.name }}
     runs-on: ubuntu-latest
     needs: [secret-scan]
+    strategy:
+      matrix:
+        include:
+          - name: frontend
+            image: myapp-frontend
+            dockerfile: frontend/docker/Dockerfile
+            context: ./frontend
+          - name: backend
+            image: myapp-backend
+            dockerfile: backend/docker/Dockerfile
+            context: ./backend
     steps:
       - uses: actions/checkout@v4
-      - name: Build frontend Docker image
-        run: docker build -t myapp-frontend -f frontend/docker/Dockerfile ./frontend
-      - name: Scan frontend image with Trivy
+      - name: Build ${{ matrix.name }} Docker image
+        run: docker build -t ${{ matrix.image }} -f ${{ matrix.dockerfile }} ${{ matrix.context }}
+      - name: Scan ${{ matrix.name }} image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'image'
-          image-ref: 'myapp-frontend'
-          format: 'table'
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '1'
-
-  backend-trivy:
-    name: Backend Trivy Image Scan
-    runs-on: ubuntu-latest
-    needs: [secret-scan]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build backend Docker image
-        run: docker build -t myapp-backend -f backend/docker/Dockerfile ./backend
-      - name: Scan backend image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'image'
-          image-ref: 'myapp-backend'
+          image-ref: '${{ matrix.image }}'
           format: 'table'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
@@ -223,7 +207,7 @@ jobs:
   codeql:
     name: CodeQL Static Analysis
     runs-on: ubuntu-latest
-    needs: [frontend-trivy, backend-trivy, terraform-validate]
+    needs: [trivy-image-scan, terraform-validate]
     permissions:
       actions: read
       contents: read
