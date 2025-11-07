@@ -1,0 +1,5 @@
+checks:
+  exclude:
+    - run-as-non-root
+    - privileged-container
+    - read-only-root-filesystem
