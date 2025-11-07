@@ -104,8 +104,8 @@ This is the most basic way to run the application with a single Deployment and S
     ```
 2.  **Apply the manifests:**
     ```bash
-    kubectl apply -f deployment.yaml
-    kubectl apply -f service.yaml
+    kubectl apply -f deployment.yml
+    kubectl apply -f service.yml
     ```
 3.  **Verify the deployment:**
     ```bash

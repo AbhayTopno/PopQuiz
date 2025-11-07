@@ -176,12 +176,53 @@ jobs:
           exit-code: '1'
 
   # -----------------------------
+  # Terraform Validation Stage
+  # -----------------------------
+  terraform-validate:
+    name: Terraform Format & Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        continue-on-error: false
+
+      - name: Create terraform.tfvars for validation
+        run: |
+          cat > terraform.tfvars <<EOF
+          project_id   = "test-project-id"
+          region       = "asia-south1"
+          zone         = "asia-south1-a"
+          cluster_name = "test-cluster"
+          environment  = "test"
+          node_count   = 2
+          machine_type = "e2-medium"
+          disk_size    = 20
+          disk_type    = "pd-standard"
+          EOF
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+  # -----------------------------
   # Final Analysis Stage
   # -----------------------------
   codeql:
     name: CodeQL Static Analysis
     runs-on: ubuntu-latest
-    needs: [k8s-validate, frontend-trivy, backend-trivy]
+    needs: [k8s-validate, frontend-trivy, backend-trivy, terraform-validate]
     permissions:
       actions: read
       contents: read

@@ -61,7 +61,7 @@ gcloud container clusters create popquiz-cluster \
 **Notes:**
 
 - `pd-standard` = HDD (cheaper, lower quota usage)
-- `e2-medium` = 2 vCPUs, 4 GB RAM
+- `e2-medium` = 4 vCPUs, 8 GB RAM
 - Zonal cluster (cheaper than regional)
 
 ### Option 2: SSD Disk (Better Performance)
