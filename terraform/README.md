@@ -193,6 +193,9 @@ cd ..
 # Create namespace
 kubectl create namespace popquiz
 
+# Install ingress controller (if not already installed)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
 # Create secrets
 kubectl create secret generic backend-secrets \
   --from-env-file=k8s/.env.backend \
@@ -282,7 +285,7 @@ disk_type    = "pd-standard"
 Edit `terraform.tfvars`:
 
 ```hcl
-node_count   = 3
+node_count   = 2
 machine_type = "e2-standard-2"
 disk_size    = 20
 disk_type    = "pd-ssd"
@@ -476,6 +479,7 @@ gcloud container clusters get-credentials popquiz-cluster --zone asia-south1-a
 # 4. Deploy app
 cd ..
 kubectl create namespace popquiz
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
 kubectl create secret generic backend-secrets --from-env-file=k8s/.env.backend -n popquiz
 kubectl apply -f k8s/base/
 

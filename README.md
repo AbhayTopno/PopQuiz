@@ -2,9 +2,6 @@
 
 ![PopQuiz Banner](https://img.shields.io/badge/PopQuiz-AI%20Quiz%20Hosting-7e22ce?style=for-the-badge&logo=appveyor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 
 PopQuiz is a full-stack web application that allows users to **instantly generate and host interactive quizzes on any topic using Gemini AI**. It features a modern, real-time interface for both quiz creation and participation, all built on a fast and scalable architecture.
 
@@ -18,20 +15,24 @@ PopQuiz is a full-stack web application that allows users to **instantly generat
 - **⚙️ Robust Backend**: Powered by Node.js and Express for a scalable and reliable API.
 - **🔐 Secure Authentication**: Uses JSON Web Tokens (JWT) stored in secure cookies.
 - **🐳 Dockerized**: Comes with a one-command Docker Compose setup for easy local development.
-- **☁️ Cloud-Ready**: Includes Kubernetes manifests for scalable deployments.
+- **☁️ Cloud-Ready**: Includes Kubernetes manifests with Blue-Green and Canary deployment strategies for zero-downtime deployments.
+- **🏗️ Infrastructure as Code**: Terraform configurations for automated GCP infrastructure provisioning and management.
+- **📊 Real-time Communication**: WebSocket support with Socket.IO for live quiz interactions and real-time updates.
 
 ---
 
 ## 🚀 Tech Stack
 
-| Category            | Technology                                                                                                                                                                                                                                                              |
-| :------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Frontend**        | ![Next.js](https://img.shields.io/badge/-Next.js-000000?style=flat&logo=next.js) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?style=flat&logo=typescript) ![GSAP](https://img.shields.io/badge/-GSAP-88CE02?style=flat&logo=greensock&logoColor=white) |
-| **Backend**         | ![Node.js](https://img.shields.io/badge/-Node.js-339933?style=flat&logo=nodedotjs) ![Express](https://img.shields.io/badge/-Express-000000?style=flat&logo=express) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?style=flat&logo=typescript)           |
-| **Database**        | ![MongoDB](https://img.shields.io/badge/-MongoDB-47A248?style=flat&logo=mongodb)                                                                                                                                                                                        |
-| **AI**              | [Groq API](https://console.groq.com/)                                                                                                                                                                                                                                   |
-| **Deployment**      | ![Docker](https://img.shields.io/badge/-Docker-2496ED?style=flat&logo=docker) ![Kubernetes](https://img.shields.io/badge/-Kubernetes-326CE5?style=flat&logo=kubernetes)                                                                                                 |
-| **Package Manager** | ![pnpm](https://img.shields.io/badge/-pnpm-F69220?style=flat&logo=pnpm)                                                                                                                                                                                                 |
+| Category             | Technology                                                                                                                                                                                                                                                                                                                                        |
+| :------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Frontend**         | ![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white) |
+| **Backend**          | ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white) ![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white)                |
+| **Database**         | ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)                                                                                                                                       |
+| **AI**               | ![Groq](https://img.shields.io/badge/Groq-FF6F00?style=for-the-badge&logo=ai&logoColor=white)                                                                                                                                                                                                                                                     |
+| **Containerization** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)                                                                                                                                                                                                                                             |
+| **Orchestration**    | ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white) ![Helm](https://img.shields.io/badge/Helm-0F1689?style=for-the-badge&logo=helm&logoColor=white)                                                                                                                                 |
+| **Infrastructure**   | ![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white) ![GCP](https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white)                                                                                                                     |
+| **Package Manager**  | ![pnpm](https://img.shields.io/badge/pnpm-F69220?style=for-the-badge&logo=pnpm&logoColor=white)                                                                                                                                                                                                                                                   |
 
 ---
 
@@ -111,20 +112,19 @@ cp .env.example .env
 
 ## 🐳 Run with Docker (Recommended)
 
-### Docker Compose makes it super simple to run the frontend, backend, and MongoDB together! 🚀
+### Docker Compose makes it super simple to run the frontend, backend, MongoDB, and Redis together! 🚀
 
 ### Step 1: Start all services
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build -d
+docker compose -f docker-compose/dev.yml up --build -d
 ```
 
 ### This will:
 
 - Spin up MongoDB 🗄️
-
-- Launch the Backend ⚙️
-
+- Launch Redis for caching 🔴
+- Start the Backend ⚙️
 - Fire up the Frontend 🌐
 
 ### Step 2: Check running containers
@@ -132,6 +132,80 @@ docker compose -f docker-compose.dev.yml up --build -d
 ```bash
 docker ps
 ```
+
+## ☸️ Kubernetes Deployment
+
+### PopQuiz comes with production-ready Kubernetes manifests supporting multiple deployment strategies!
+
+### Available Deployment Strategies:
+
+#### 1. **Base Deployment** (Simple & Straightforward)
+
+```bash
+kubectl apply -f k8s/base/
+```
+
+#### 2. **Blue-Green Deployment** (Zero-downtime updates)
+
+```bash
+kubectl apply -f k8s/blue-green/
+```
+
+#### 3. **Canary Deployment** (Gradual rollout with traffic splitting)
+
+```bash
+kubectl apply -f k8s/canary/
+```
+
+#### 4. **Helm Chart** (Package manager for Kubernetes)
+
+```bash
+helm install popquiz k8s/helm/popquiz-chart/
+```
+
+### Features:
+
+- ✅ Horizontal Pod Autoscaling (HPA)
+- ✅ Vertical Pod Autoscaling (VPA)
+- ✅ WebSocket support via NGINX Ingress
+- ✅ Security contexts and resource limits
+- ✅ Redis for session management
+
+## 🏗️ Terraform Infrastructure
+
+### Automate your GCP infrastructure provisioning with Terraform!
+
+### Step 1: Navigate to terraform directory
+
+```bash
+cd terraform
+```
+
+### Step 2: Initialize Terraform
+
+```bash
+terraform init
+```
+
+### Step 3: Review the plan
+
+```bash
+terraform plan
+```
+
+### Step 4: Apply infrastructure
+
+```bash
+terraform apply
+```
+
+### What gets provisioned:
+
+- 🌐 GKE (Google Kubernetes Engine) cluster
+- 🔒 VPC networks and firewall rules
+- 💾 Persistent storage resources
+- 🔑 Service accounts and IAM roles
+- 📊 Monitoring and logging setup
 
 ## 💻 Running Without Docker (Optional)
 
@@ -190,10 +264,47 @@ git push origin feature/my-new-feature
 
 # 💡 Why Contribute to PopQuiz?
 
-- #### Learn: Dive into a modern full-stack app with Next.js, TypeScript, and AI integration.
+- #### Learn: Dive into a modern full-stack app with Next.js, TypeScript, AI integration, Kubernetes orchestration, and Infrastructure as Code.
 
 - #### Impact: Help create a fun, educational tool for students and teachers worldwide.
 
 - #### Community: Join a friendly team of developers passionate about learning and tech! 🤗
 
-- #### Happy coding, and let’s make PopQuiz even more awesome together! 🚀✨
+- #### Cloud-Native: Gain hands-on experience with Docker, Kubernetes, Terraform, and cloud deployment strategies.
+
+# 📚 Project Structure
+
+```
+PopQuiz/
+├── frontend/          # Next.js frontend application
+├── backend/           # Node.js + Express backend
+├── k8s/              # Kubernetes manifests
+│   ├── base/         # Basic deployment
+│   ├── blue-green/   # Blue-green deployment strategy
+│   ├── canary/       # Canary deployment strategy
+│   ├── helm/         # Helm charts
+│   └── autoscaling/  # HPA & VPA configurations
+├── terraform/        # Infrastructure as Code
+├── docker-compose/   # Docker Compose files
+└── ansible/          # Configuration management (optional)
+```
+
+# 🌐 Deployment Strategies Explained
+
+### **Blue-Green Deployment**
+
+Two identical production environments (Blue & Green). Traffic switches instantly from one to the other, enabling instant rollback if issues arise.
+
+### **Canary Deployment**
+
+New version is gradually rolled out to a small percentage of users first (e.g., 10%), then gradually increased. Reduces risk of widespread issues.
+
+### **Horizontal Pod Autoscaling (HPA)**
+
+Automatically scales the number of pods based on CPU/memory usage or custom metrics.
+
+### **Vertical Pod Autoscaling (VPA)**
+
+Automatically adjusts CPU and memory requests/limits based on actual usage patterns.
+
+- #### Happy coding, and let's make PopQuiz even more awesome together! 🚀✨

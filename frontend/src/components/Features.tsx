@@ -99,10 +99,12 @@ export const BentoCard: React.FC<BentoCardProps> = ({
         playsInline // Added for better mobile compatibility
         className="absolute left-0 top-0 size-full object-cover object-center"
       />
-      <div className="relative z-10 flex size-full flex-col justify-between p-5 text-blue-50">
+      <div className="relative z-10 flex size-full flex-col justify-between p-4 sm:p-8 text-blue-50">
         <div>
-          <h1 className="bento-title special-font">{title}</h1>
-          {description && <p className="mt-3 max-w-64 text-xs md:text-base">{description}</p>}
+          <h1 className="bento-title special-font leading-tight">{title}</h1>
+          {description && (
+            <p className="mt-2 sm:mt-3 max-w-64 text-xs sm:text-base">{description}</p>
+          )}
         </div>
 
         {isComingSoon && (
@@ -112,7 +114,7 @@ export const BentoCard: React.FC<BentoCardProps> = ({
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             onClick={onOpen}
-            className="border-hsla relative flex w-fit cursor-pointer items-center gap-1 overflow-hidden rounded-full bg-black px-5 py-2 text-xs uppercase text-white"
+            className="border-hsla relative flex w-fit cursor-pointer items-center gap-1 overflow-hidden rounded-full bg-black px-3 sm:px-5 py-1.5 sm:py-2 text-xs uppercase text-white"
           >
             <div
               className="pointer-events-none absolute -inset-px opacity-0 transition duration-300"
@@ -140,17 +142,19 @@ const Features: React.FC = () => {
   };
 
   return (
-    <section className="bg-black pb-52">
-      <div className="container mx-auto px-3 md:px-10">
-        <div className="px-5 py-32">
-          <p className="font-circular-web text-lg text-blue-50">Step Into the Quizverse</p>
-          <p className="max-w-md font-circular-web text-lg text-blue-50 opacity-50">
+    <section className="bg-black pb-32 sm:pb-40 md:pb-52">
+      <div className="container mx-auto px-4 sm:px-10">
+        <div className="px-4 sm:px-5 py-20 sm:py-32">
+          <p className="font-circular-web text-base sm:text-lg text-blue-50">
+            Step Into the Quizverse
+          </p>
+          <p className="max-w-md font-circular-web text-sm sm:text-lg text-blue-50 opacity-50">
             Enter a dynamic world of knowledge where real-time battles, solo challenges, and
             AI-powered quizzes blend into one seamless and thrilling experience.
           </p>
         </div>
 
-        <BentoTilt className="border-hsla relative mb-7 h-96 w-full overflow-hidden rounded-md md:h-[65vh]">
+        <BentoTilt className="border-hsla relative mb-7 h-64 sm:h-96 w-full overflow-hidden rounded-md">
           <BentoCard
             src="https://cdn.jsdelivr.net/gh/AbhayTopno/Resources@1.0.0/feature-1.hevc.mp4"
             title={
@@ -163,8 +167,8 @@ const Features: React.FC = () => {
           />
         </BentoTilt>
 
-        <div className="grid h-[135vh] w-full grid-cols-2 grid-rows-3 gap-7">
-          <BentoTilt className="bento-tilt_1 row-span-1 md:col-span-1 md:row-span-2">
+        <div className="grid h-auto sm:h-[135vh] w-full grid-cols-2 grid-rows-3 gap-3 sm:gap-7">
+          <BentoTilt className="bento-tilt_1 row-span-1 sm:col-span-1 sm:row-span-2">
             <BentoCard
               src="https://cdn.jsdelivr.net/gh/AbhayTopno/Resources@1.0.0/feature-2.hevc.mp4"
               title={
@@ -177,7 +181,7 @@ const Features: React.FC = () => {
             />
           </BentoTilt>
 
-          <BentoTilt className="bento-tilt_1 row-span-1 ms-32 md:col-span-1 md:ms-0">
+          <BentoTilt className="bento-tilt_1 row-span-1 ms-12 sm:ms-0 sm:col-span-1">
             <BentoCard
               src="https://cdn.jsdelivr.net/gh/AbhayTopno/Resources@1.0.0/feature-3.hevc.mp4"
               title={<>History</>}
@@ -186,7 +190,7 @@ const Features: React.FC = () => {
             />
           </BentoTilt>
 
-          <BentoTilt className="bento-tilt_1 me-14 md:col-span-1 md:me-0">
+          <BentoTilt className="bento-tilt_1 me-6 sm:me-0 sm:col-span-1">
             <BentoCard
               src="https://cdn.jsdelivr.net/gh/AbhayTopno/Resources@1.0.0/feature-4.hevc.mp4"
               title={<>DC</>}
@@ -196,11 +200,11 @@ const Features: React.FC = () => {
           </BentoTilt>
 
           <BentoTilt className="bento-tilt_2" onClick={() => openPopup('')}>
-            <div className="relative flex size-full flex-col justify-between bg-gradient-to-r from-violet-900 via-indigo-900 to-gray-900 p-5">
-              <h1 className="bento-title special-font max-w-64 text-white">
+            <div className="relative flex size-full flex-col justify-between bg-gradient-to-r from-violet-900 via-indigo-900 to-gray-900 p-4 sm:p-8">
+              <h1 className="bento-title special-font max-w-64 text-white leading-tight">
                 Cr<b>e</b>ate y<b>o</b>ur <br /> own quiz a<b>d</b>venture!
               </h1>
-              <TiLocationArrow className="absolute bottom-10 right-10 scale-[5] text-slate-300" />
+              <TiLocationArrow className="absolute bottom-4 right-4 scale-[2] sm:bottom-10 sm:right-10 sm:scale-[5] text-slate-300" />
             </div>
           </BentoTilt>
 

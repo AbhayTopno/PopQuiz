@@ -21,12 +21,14 @@ export default function ChatBox({
   }, [messages]);
 
   return (
-    <>
-      <div className="mb-2 text-sm font-semibold uppercase text-white/80">Chat</div>
-      <div className="flex-1 overflow-hidden mb-2">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="mb-2 text-sm font-semibold uppercase text-white/80 flex-shrink-0">Chat</div>
+
+      {/* Chat Messages - Takes all available space */}
+      <div className="flex-1 overflow-hidden mb-2 min-h-0">
         <div
           ref={chatContainerRef}
-          className="h-full overflow-auto rounded-lg border border-white/10 bg-black/30 p-2 text-xs"
+          className="h-full overflow-y-auto overflow-x-hidden rounded-lg border border-white/10 bg-black/30 p-3 text-xs scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
         >
           {messages.length === 0 && <div className="text-white/60">No messages yet.</div>}
           {messages.map((msg, idx) => {
@@ -61,22 +63,25 @@ export default function ChatBox({
         </div>
       </div>
 
-      <form onSubmit={onSendMessage} className="flex gap-2">
-        <input
-          className="flex-1 rounded-lg border border-white/20 bg-black/10 shadow-2xl px-3 py-2 font-mono text-sm truncate"
-          value={messageInput}
-          onChange={(e) => setMessageInput(e.target.value)}
-          placeholder="Type a message…"
-          disabled={!connected}
-        />
-        <button
-          disabled={!connected}
-          className="rounded-lg bg-blue-500 px-4 py-2 text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors"
-        >
-          Send
-        </button>
-      </form>
-      {!connected && <div className="mt-2 text-xs text-red-400">Disconnected from server…</div>}
-    </>
+      {/* Input Form - Fixed at bottom */}
+      <div className="flex-shrink-0">
+        <form onSubmit={onSendMessage} className="flex gap-2">
+          <input
+            className="flex-1 rounded-lg border border-white/20 bg-black/10 shadow-2xl px-3 py-2 font-mono text-sm truncate"
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            placeholder="Type a message…"
+            disabled={!connected}
+          />
+          <button
+            disabled={!connected}
+            className="rounded-lg bg-blue-500 px-4 py-2 text-sm hover:bg-blue-600 disabled:opacity-50 transition-colors"
+          >
+            Send
+          </button>
+        </form>
+        {!connected && <div className="mt-2 text-xs text-red-400">Disconnected from server…</div>}
+      </div>
+    </div>
   );
 }

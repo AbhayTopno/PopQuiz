@@ -55,6 +55,11 @@ const Hero: FC = () => {
     () => {
       if (hasClicked && isNextVideoReady) {
         gsap.set('#next-video', { visibility: 'visible' });
+
+        // Get responsive video size based on window width
+        const videoSize =
+          window.innerWidth < 640 ? '12rem' : window.innerWidth < 768 ? '14rem' : '16rem';
+
         gsap.to('#next-video', {
           transformOrigin: 'center center',
           scale: 1,
@@ -71,8 +76,8 @@ const Hero: FC = () => {
             setBackgroundIndex(currentIndex);
             gsap.set('#next-video', {
               visibility: 'hidden',
-              width: '16rem',
-              height: '16rem',
+              width: videoSize,
+              height: videoSize,
             });
             setHasClicked(false);
             setIsNextVideoReady(false);
@@ -134,9 +139,9 @@ const Hero: FC = () => {
   };
 
   return (
-    <div className="relative h-dvh w-screen overflow-x-hidden">
+    <div className="relative h-dvh w-full max-w-[100vw] overflow-x-hidden">
       {loading && (
-        <div className="flex-center absolute z-[100] h-dvh w-screen overflow-hidden bg-violet-50">
+        <div className="flex-center absolute z-[100] h-dvh w-full overflow-hidden bg-violet-50">
           <div className="three-body">
             <div className="three-body__dot"></div>
             <div className="three-body__dot"></div>
@@ -147,14 +152,14 @@ const Hero: FC = () => {
 
       <div
         id="video-frame"
-        className="relative z-10 h-dvh w-screen overflow-hidden rounded-lg bg-black"
+        className="relative z-10 h-dvh w-full overflow-hidden rounded-lg bg-black"
       >
         <div>
-          <div className="absolute top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%] z-50 size-64 cursor-pointer">
+          <div className="absolute top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%] z-50 w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 cursor-pointer">
             <VideoPreview>
               <div
                 onClick={handleMiniVdClick}
-                className="size-64 scale-50 opacity-0 transition-all duration-500 ease-in-out hover:scale-105 hover:opacity-100 hover:rotate-[-3deg] overflow-hidden rounded-lg"
+                className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 scale-50 opacity-0 transition-all duration-500 ease-in-out hover:scale-105 hover:opacity-100 hover:rotate-[-3deg] overflow-hidden rounded-lg"
               >
                 <video
                   key={`preview-${currentIndex}`}
@@ -176,7 +181,7 @@ const Hero: FC = () => {
             loop
             muted
             id="next-video"
-            className="absolute top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%] z-20 size-64 object-cover object-center"
+            className="absolute top-1/2 left-1/2 translate-x-[-50%] translate-y-[-50%] z-20 w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 object-cover object-center"
             style={{ visibility: 'hidden' }}
             playsInline
             onLoadedData={handleVideoLoad}
@@ -201,15 +206,15 @@ const Hero: FC = () => {
 
         <h1
           key={`title-1-${backgroundIndex}`}
-          className="dynamic-title special-font hero-heading absolute bottom-5 right-5 z-40 text-blue-75"
+          className="dynamic-title special-font hero-heading absolute bottom-3 right-3 sm:bottom-4 sm:right-4 md:bottom-5 md:right-5 z-40 text-blue-75"
           dangerouslySetInnerHTML={{ __html: videoTitles[backgroundIndex - 1] }}
         />
         <div className="absolute left-0 top-0 z-40 size-full">
-          <div className="mt-24 px-5 sm:px-10">
+          <div className="mt-28 sm:mt-36 px-4 sm:px-10">
             <h1 className="special-font hero-heading text-blue-100">
               challe<b>n</b>ge
             </h1>
-            <p className="mb-5 max-w-64 font-robert-regular text-blue-100">
+            <p className="mb-4 sm:mb-5 max-w-56 sm:max-w-64 text-sm sm:text-base font-robert-regular text-blue-100">
               Step Into the Quizverse <br /> Master the Game of Knowledge
             </p>
 
@@ -217,7 +222,7 @@ const Hero: FC = () => {
               id="watch-trailer"
               title="Test Your Mind"
               leftIcon={<TiLocationArrow />}
-              containerClass="bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 hover:opacity-90 text-white flex-center gap-1"
+              containerClass="bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 hover:opacity-90 text-white flex-center gap-1 text-sm sm:text-base"
               onClick={openPopup}
             />
           </div>
@@ -226,7 +231,7 @@ const Hero: FC = () => {
 
       <h1
         key={`title-2-${backgroundIndex}`}
-        className="dynamic-title special-font hero-heading absolute bottom-5 right-5 text-black"
+        className="dynamic-title special-font hero-heading absolute bottom-3 right-3 sm:bottom-4 sm:right-4 md:bottom-5 md:right-5 text-black"
         dangerouslySetInnerHTML={{ __html: videoTitles[backgroundIndex - 1] }}
       />
 

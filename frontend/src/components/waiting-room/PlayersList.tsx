@@ -1,7 +1,13 @@
 import React from 'react';
 import type { PlayersListProps } from '@/types';
 
-export default function PlayersList({ players, mode }: PlayersListProps) {
+export default function PlayersList({
+  players,
+  mode,
+  isHost,
+  socket,
+  onKickPlayer,
+}: PlayersListProps) {
   const getPlayerLabel = () => {
     switch (mode) {
       case '1v1':
@@ -52,25 +58,39 @@ export default function PlayersList({ players, mode }: PlayersListProps) {
   };
 
   return (
-    <>
+    <div className="flex-shrink-0">
       <div className="mb-3 text-sm font-semibold uppercase text-white/80">
         Players {getPlayerLabel()}
       </div>
-      <div className="mb-4 flex flex-wrap gap-2 overflow-auto max-h-24">
-        {players.map((p, i) => (
-          <span
-            key={p.id}
-            className={`rounded px-2 py-1 text-xs flex items-center gap-1 ${
-              i === 0
-                ? 'border-2 border-purple-500/50 bg-purple-500/10 text-purple-300'
-                : 'bg-white/10'
-            }`}
-          >
-            {p.name}
-          </span>
-        ))}
+      <div className="mb-4 flex flex-wrap gap-2 p-2">
+        {players.map((p, i) => {
+          const isCurrentUser = p.id === socket?.id;
+          const isHostPlayer = i === 0;
+
+          return (
+            <span
+              key={p.id}
+              className={`rounded px-2 py-1 text-xs flex items-center gap-2 ${
+                isHostPlayer
+                  ? 'border-2 border-purple-500/50 bg-purple-500/10 text-purple-300'
+                  : 'bg-white/10'
+              }`}
+            >
+              {p.name}
+              {isHost && !isCurrentUser && (
+                <button
+                  onClick={() => onKickPlayer(p.id, p.name)}
+                  className="text-red-500 hover:text-red-400 ml-1 font-bold transition-colors"
+                  title="Kick player from room"
+                >
+                  ⨯
+                </button>
+              )}
+            </span>
+          );
+        })}
         {getStatusMessage()}
       </div>
-    </>
+    </div>
   );
 }
