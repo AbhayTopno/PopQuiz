@@ -37,20 +37,21 @@ metadata:
   name: popquiz-backend-deployment-canary
   namespace: popquiz
   labels:
-    app: popquiz-backend
+    app: popquiz-backend-canary
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: popquiz-backend
+      app: popquiz-backend-canary
   template:
     metadata:
       labels:
-        app: popquiz-backend
+        app: popquiz-backend-canary
+        version: canary
     spec:
       containers:
         - name: popquiz-backend
-          image: abhaytopno/popquiz-backend:v4
+          image: abhaytopno/popquiz-backend:v5
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
@@ -73,6 +74,10 @@ spec:
             limits:
               cpu: '500m'
               memory: '512Mi'
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -80,20 +85,21 @@ metadata:
   name: popquiz-frontend-deployment-canary
   namespace: popquiz
   labels:
-    app: popquiz-frontend
+    app: popquiz-frontend-canary
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: popquiz-frontend
+      app: popquiz-frontend-canary
   template:
     metadata:
       labels:
-        app: popquiz-frontend
+        app: popquiz-frontend-canary
+        version: canary
     spec:
       containers:
         - name: popquiz-frontend
-          image: abhaytopno/popquiz-frontend:v3
+          image: abhaytopno/popquiz-frontend:v5
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000

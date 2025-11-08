@@ -48,10 +48,11 @@ spec:
     metadata:
       labels:
         app: popquiz-backend
+        version: green
     spec:
       containers:
         - name: popquiz-backend
-          image: abhaytopno/popquiz-backend:v4
+          image: abhaytopno/popquiz-backend:v5
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
@@ -74,6 +75,10 @@ spec:
             limits:
               cpu: '500m'
               memory: '512Mi'
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -91,10 +96,11 @@ spec:
     metadata:
       labels:
         app: popquiz-frontend
+        version: green
     spec:
       containers:
         - name: popquiz-frontend
-          image: abhaytopno/popquiz-frontend:v3
+          image: abhaytopno/popquiz-frontend:v5
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000

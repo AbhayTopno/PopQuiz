@@ -184,10 +184,10 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
   if (!open) return null;
 
   const inputClass =
-    'w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/50 backdrop-blur-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50';
+    'w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base text-white placeholder-white/50 backdrop-blur-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50';
 
   const toggleButtonBaseClass =
-    'px-4 py-2 rounded-lg font-general text-sm font-semibold uppercase transition-colors';
+    'px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg font-general text-xs sm:text-sm font-semibold uppercase transition-colors';
   const toggleButtonActiveClass = 'bg-blue-500 text-white';
   const toggleButtonInactiveClass = 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white';
 
@@ -203,7 +203,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
     >
       <div
         ref={popupRef}
-        className="relative w-full max-w-lg rounded-2xl border border-white/20 bg-black/40 p-8 shadow-2xl"
+        className="relative w-[95vw] max-w-[90vw] sm:w-full sm:max-w-lg rounded-2xl border border-white/20 bg-black/40 p-4 sm:p-6 md:p-8 shadow-2xl"
         style={{ backdropFilter: 'blur(20px)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -214,14 +214,16 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
           ×
         </button>
 
-        <h2 className="mb-6 text-center font-zentry text-3xl font-black uppercase text-white">
+        <h2 className="mb-4 sm:mb-6 text-center font-zentry text-xl sm:text-2xl md:text-3xl font-black uppercase text-white">
           {topic ? `Quiz on ${topic}` : 'Create Custom Quiz'}
         </h2>
 
         <div className="space-y-4">
           {/* Topic Input */}
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">Quiz Topic</label>
+            <label className="mb-1 sm:mb-2 block font-general text-xs sm:text-sm text-white/80">
+              Quiz Topic
+            </label>
             <input
               type="text"
               value={quizTopic}
@@ -233,8 +235,10 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
 
           {/* Difficulty */}
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">Difficulty</label>
-            <div className="flex gap-2">
+            <label className="mb-1 sm:mb-2 block font-general text-xs sm:text-sm text-white/80">
+              Difficulty
+            </label>
+            <div className="flex gap-1 sm:gap-2">
               {difficulties.map((d) => (
                 <button
                   key={d}
@@ -251,8 +255,10 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
 
           {/* Battle Type */}
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">Battle Type</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="mb-1 sm:mb-2 block font-general text-xs sm:text-sm text-white/80">
+              Battle Type
+            </label>
+            <div className="flex flex-wrap gap-1 sm:gap-2">
               {battleTypes.map((type) => (
                 <button
                   key={type}
@@ -290,9 +296,11 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
           </div>
 
           {/* Questions & Duration */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div>
-              <label className="mb-2 block font-general text-sm text-white/80">Questions</label>
+              <label className="mb-1 sm:mb-2 block font-general text-xs sm:text-sm text-white/80">
+                Questions
+              </label>
               <input
                 type="number"
                 value={questionCount}
@@ -306,7 +314,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
             </div>
 
             <div>
-              <label className="mb-2 block font-general text-sm text-white/80">
+              <label className="mb-1 sm:mb-2 block font-general text-xs sm:text-sm text-white/80">
                 Duration (sec)
               </label>
               <input
@@ -322,17 +330,17 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
 
           {/* Error Message */}
           {error && (
-            <div className="rounded-lg bg-red-500/20 border border-red-500/50 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-lg bg-red-500/20 border border-red-500/50 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm text-red-200">
               {error}
             </div>
           )}
 
           {/* Start Button */}
-          <div className="pt-4">
+          <div className="pt-2 sm:pt-4">
             <button
               onClick={handleStart}
               disabled={isSubmitting}
-              className="w-full rounded-lg bg-blue-500 px-4 py-3 font-general font-semibold uppercase text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg bg-blue-500 px-3 py-2 sm:px-4 sm:py-3 font-general text-sm sm:text-base font-semibold uppercase text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? 'Generating...' : 'Ikuzo!'}
             </button>

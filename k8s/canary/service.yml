@@ -1,18 +1,19 @@
 # service.yml
-# --- Stable Services ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: popquiz-frontend-service-stable
+  name: redis
   namespace: popquiz
 spec:
   selector:
-    app: popquiz-frontend
-    version: stable
+    app: redis
   ports:
-    - port: 80
-      targetPort: 3000
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+
 ---
+# --- Backend Services ---
 apiVersion: v1
 kind: Service
 metadata:
@@ -23,22 +24,10 @@ spec:
     app: popquiz-backend
     version: stable
   ports:
-    - port: 80
+    - protocol: TCP
+      port: 80
       targetPort: 5000
-# --- Canary Services ---
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: popquiz-frontend-service-canary
-  namespace: popquiz
-spec:
-  selector:
-    app: popquiz-frontend-canary
-    version: canary
-  ports:
-    - port: 80
-      targetPort: 3000
+  type: ClusterIP
 ---
 apiVersion: v1
 kind: Service
@@ -50,5 +39,39 @@ spec:
     app: popquiz-backend-canary
     version: canary
   ports:
-    - port: 80
+    - protocol: TCP
+      port: 80
       targetPort: 5000
+  type: ClusterIP
+
+---
+# --- Frontend Services ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-frontend-service-stable
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-frontend
+    version: stable
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-frontend-service-canary
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-frontend-canary
+    version: canary
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP

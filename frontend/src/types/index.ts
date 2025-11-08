@@ -154,6 +154,9 @@ export interface ServerChatMessage {
 export interface PlayersListProps {
   players: WaitingRoomPlayer[];
   mode: string;
+  isHost: boolean;
+  socket: { id?: string } | null;
+  onKickPlayer: (playerId: string, playerName: string) => void;
 }
 
 export interface ChatBoxProps {

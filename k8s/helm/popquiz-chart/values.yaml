@@ -2,7 +2,7 @@ namespace: popquiz
 
 backend:
   name: popquiz-backend
-  image: abhaytopno/popquiz-backend:v4
+  image: abhaytopno/popquiz-backend:v5
   port: 5000
   resources:
     requests:
@@ -19,7 +19,7 @@ backend:
 
 frontend:
   name: popquiz-frontend
-  image: abhaytopno/popquiz-frontend:v3
+  image: abhaytopno/popquiz-frontend:v5
   port: 3000
   resources:
     requests:

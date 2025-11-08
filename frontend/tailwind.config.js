@@ -26,6 +26,17 @@ export default {
           300: '#edff66',
         },
       },
+      screens: {
+        xs: '475px',
+      },
+      maxWidth: {
+        '8xl': '88rem',
+        '9xl': '96rem',
+      },
+      spacing: {
+        128: '32rem',
+        144: '36rem',
+      },
     },
   },
   plugins: [],

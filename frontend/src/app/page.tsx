@@ -12,7 +12,7 @@ export const dynamic = 'force-static';
 function App() {
   return (
     <AuthProvider>
-      <main className="relative min-h-screen w-screen overflow-x-hidden">
+      <main className="relative min-h-screen w-full max-w-[100vw] overflow-x-hidden">
         <NavBar />
         <Hero />
         <About />

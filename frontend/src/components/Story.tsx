@@ -49,14 +49,14 @@ const FloatingImage: React.FC = () => {
   };
 
   return (
-    <div id="story" className="min-h-dvh w-screen bg-black text-blue-50">
-      <div className="flex size-full flex-col items-center py-10 pb-24">
-        <p className="font-general text-sm uppercase md:text-[10px]">the arena of knowledge</p>
+    <div id="story" className="min-h-dvh w-full max-w-[100vw] bg-black text-blue-50">
+      <div className="flex size-full flex-col items-center py-8 sm:py-10 pb-16 sm:pb-24">
+        <p className="font-general text-xs sm:text-[10px] uppercase">the arena of knowledge</p>
 
         <div className="relative size-full">
           <AnimatedTitle
             title="the st<b>o</b>ry of <br /> a quizverse reb<b>o</b>rn"
-            containerClass="mt-5 pointer-events-none mix-blend-difference relative z-10"
+            containerClass="mt-4 sm:mt-5 pointer-events-none mix-blend-difference relative z-10"
           />
 
           <div className="story-img-container">
@@ -94,14 +94,18 @@ const FloatingImage: React.FC = () => {
           </div>
         </div>
 
-        <div className="-mt-80 flex w-full justify-center md:-mt-64 md:me-44 md:justify-end">
-          <div className="flex h-full w-fit flex-col items-center md:items-start">
-            <p className="mt-3 max-w-sm text-center font-circular-web text-violet-50 md:text-start">
+        <div className="-mt-60 sm:-mt-64 flex w-full justify-center px-4 sm:me-44 sm:justify-end">
+          <div className="flex h-full w-fit flex-col items-center sm:items-start">
+            <p className="mt-3 max-w-xs sm:max-w-sm text-center text-sm sm:text-base font-circular-web text-violet-50 sm:text-start">
               Beyond every question lies a gateway—PopQuiz, where curiosity fuels challenge. Step
               inside and prove your mastery across infinite realms of knowledge.
             </p>
 
-            <Button id="realm-btn" title="begin your journey" containerClass="mt-5" />
+            <Button
+              id="realm-btn"
+              title="begin your journey"
+              containerClass="mt-4 sm:mt-5 text-sm sm:text-base"
+            />
           </div>
         </div>
       </div>

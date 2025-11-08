@@ -6,7 +6,7 @@ export default function TeamManagement({
   players,
   teamAssignments,
   isHost,
-  socket,
+  socket: _socket,
   draggedPlayerId,
   dragOverTeam,
   onDragStart,
@@ -15,7 +15,7 @@ export default function TeamManagement({
   onDragEnter,
   onDragLeave,
   onDrop,
-  onKickPlayer,
+  onKickPlayer: _onKickPlayer,
   onAssignPlayer,
 }: TeamManagementProps) {
   if (mode !== '2v2' && mode !== 'custom') return null;
@@ -46,27 +46,17 @@ export default function TeamManagement({
             {teamAssignments.teamA.map((playerId) => {
               const player = players.find((p) => p.id === playerId);
               if (!player) return null;
-              const isCurrentUser = playerId === socket.id;
               return (
                 <div
                   key={playerId}
                   draggable={isHost}
                   onDragStart={(e) => onDragStart(e, playerId)}
                   onDragEnd={onDragEnd}
-                  className={`flex items-center justify-between bg-cyan-500/10 rounded px-2 py-1.5 text-xs transition-opacity ${
+                  className={`bg-cyan-500/10 rounded px-2 py-1.5 text-xs transition-opacity ${
                     isHost ? 'cursor-move' : ''
                   } ${draggedPlayerId === playerId ? 'opacity-50' : ''}`}
                 >
                   <span className="text-white truncate">{player.name}</span>
-                  {isHost && !isCurrentUser && (
-                    <button
-                      onClick={() => onKickPlayer(playerId, player.name)}
-                      className="text-red-600 hover:text-red-500 ml-2 text-sm font-bold"
-                      title="Kick player from room"
-                    >
-                      ⨯
-                    </button>
-                  )}
                 </div>
               );
             })}
@@ -95,27 +85,17 @@ export default function TeamManagement({
             {teamAssignments.teamB.map((playerId) => {
               const player = players.find((p) => p.id === playerId);
               if (!player) return null;
-              const isCurrentUser = playerId === socket.id;
               return (
                 <div
                   key={playerId}
                   draggable={isHost}
                   onDragStart={(e) => onDragStart(e, playerId)}
                   onDragEnd={onDragEnd}
-                  className={`flex items-center justify-between bg-red-500/10 rounded px-2 py-1.5 text-xs transition-opacity ${
+                  className={`bg-red-500/10 rounded px-2 py-1.5 text-xs transition-opacity ${
                     isHost ? 'cursor-move' : ''
                   } ${draggedPlayerId === playerId ? 'opacity-50' : ''}`}
                 >
                   <span className="text-white truncate">{player.name}</span>
-                  {isHost && !isCurrentUser && (
-                    <button
-                      onClick={() => onKickPlayer(playerId, player.name)}
-                      className="text-red-600 hover:text-red-500 ml-2 text-sm font-bold"
-                      title="Kick player from room"
-                    >
-                      ⨯
-                    </button>
-                  )}
                 </div>
               );
             })}
@@ -139,7 +119,6 @@ export default function TeamManagement({
                   !teamAssignments.teamA.includes(p.id) && !teamAssignments.teamB.includes(p.id),
               )
               .map((player) => {
-                const isCurrentUser = player.id === socket.id;
                 return (
                   <div
                     key={player.id}
@@ -162,15 +141,6 @@ export default function TeamManagement({
                     >
                       {player.name} → B
                     </button>
-                    {!isCurrentUser && (
-                      <button
-                        onClick={() => onKickPlayer(player.id, player.name)}
-                        className="text-red-600 hover:text-red-500 px-2 text-sm font-bold"
-                        title="Kick player from room"
-                      >
-                        ⨯
-                      </button>
-                    )}
                   </div>
                 );
               })}

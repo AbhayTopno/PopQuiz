@@ -94,7 +94,7 @@ const JoinRoomPopup: React.FC<Props> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const inputClass =
-    'w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/50 backdrop-blur-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50';
+    'w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 sm:px-4 sm:py-3 text-sm sm:text-base text-white placeholder-white/50 backdrop-blur-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50';
 
   return (
     <div
@@ -105,7 +105,7 @@ const JoinRoomPopup: React.FC<Props> = ({ isOpen, onClose }) => {
     >
       <div
         ref={popupRef}
-        className="relative w-full max-w-lg rounded-2xl border border-white/20 bg-black/40 p-8 shadow-2xl"
+        className="relative w-[95vw] max-w-[90vw] sm:w-full sm:max-w-lg rounded-2xl border border-white/20 bg-black/40 p-4 sm:p-6 md:p-8 shadow-2xl"
         style={{ backdropFilter: 'blur(20px)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -116,13 +116,13 @@ const JoinRoomPopup: React.FC<Props> = ({ isOpen, onClose }) => {
           ×
         </button>
 
-        <h2 className="mb-6 text-center font-zentry text-3xl font-black uppercase text-white">
+        <h2 className="mb-4 sm:mb-6 text-center font-zentry text-xl sm:text-2xl md:text-3xl font-black uppercase text-white">
           Join Room
         </h2>
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="mb-2 block font-general text-sm text-white/80">
+            <label className="mb-1 sm:mb-2 block font-general text-xs sm:text-sm text-white/80">
               Paste invite link or Room ID
             </label>
             <input
@@ -135,7 +135,7 @@ const JoinRoomPopup: React.FC<Props> = ({ isOpen, onClose }) => {
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-500/20 border border-red-500/50 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-lg bg-red-500/20 border border-red-500/50 px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm text-red-200">
               {error}
             </div>
           )}
@@ -144,7 +144,7 @@ const JoinRoomPopup: React.FC<Props> = ({ isOpen, onClose }) => {
             <button
               type="submit"
               disabled={isJoining || !input.trim()}
-              className="w-full rounded-lg bg-blue-500 px-4 py-3 font-general font-semibold uppercase text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-lg bg-blue-500 px-3 py-2 sm:px-4 sm:py-3 font-general text-sm sm:text-base font-semibold uppercase text-white transition-all hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isJoining ? 'Joining...' : 'Join'}
             </button>

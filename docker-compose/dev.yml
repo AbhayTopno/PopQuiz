@@ -37,7 +37,11 @@ services:
       - /usr/src/app/.next # (optional) preserve Next.js cache
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_DOCKER_BACKEND_API=http://backend:5000
+      - INTERNAL_API_URL=http://backend:5000
+      - API_URL=http://localhost:5000
+      - SOCKET_URL=http://localhost:5000
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
     depends_on:
       - backend
     command: pnpm run dev # Use Next.js dev mode

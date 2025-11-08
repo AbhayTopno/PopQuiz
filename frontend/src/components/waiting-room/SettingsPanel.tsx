@@ -12,7 +12,7 @@ export default function SettingsPanel({
   onCopyLink,
 }: SettingsPanelProps) {
   return (
-    <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+    <div className="space-y-4 flex-1 overflow-y-auto px-2 ">
       <div>
         <label className="mb-1 block text-sm text-white/80">Room ID</label>
         <div className="flex gap-2">
@@ -61,7 +61,7 @@ export default function SettingsPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 pb-2">
         <div>
           <label className="mb-1 block text-sm text-white/80">Questions</label>
           <input

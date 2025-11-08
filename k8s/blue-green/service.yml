@@ -1,32 +1,19 @@
 # services.yml
-# --- Frontend Services ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: popquiz-frontend-service-blue
+  name: redis
   namespace: popquiz
 spec:
   selector:
-    app: popquiz-frontend
-    version: blue
+    app: redis
   ports:
-    - port: 80
-      targetPort: 3000
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: popquiz-frontend-service-green
-  namespace: popquiz
-spec:
-  selector:
-    app: popquiz-frontend
-    version: green
-  ports:
-    - port: 80
-      targetPort: 3000
 # --- Backend Services ---
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -37,8 +24,10 @@ spec:
     app: popquiz-backend
     version: blue
   ports:
-    - port: 80
+    - protocol: TCP
+      port: 80
       targetPort: 5000
+  type: ClusterIP
 ---
 apiVersion: v1
 kind: Service
@@ -50,5 +39,39 @@ spec:
     app: popquiz-backend
     version: green
   ports:
-    - port: 80
+    - protocol: TCP
+      port: 80
       targetPort: 5000
+  type: ClusterIP
+
+---
+# --- Frontend Services ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-frontend-service-blue
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-frontend
+    version: blue
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-frontend-service-green
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-frontend
+    version: green
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP

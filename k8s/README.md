@@ -55,9 +55,6 @@ Follow these initial setup steps before trying any of the deployment strategies.
     ```bash
     # Create secrets for the backend (e.g., database credentials)
     kubectl create secret generic backend-secrets --namespace popquiz --from-env-file=.env.backend
-
-    # Create a configmap for the frontend (e.g., API URLs)
-    kubectl create configmap frontend-config --namespace popquiz --from-env-file=.env.frontend
     ```
 
 ---
@@ -106,6 +103,7 @@ This is the most basic way to run the application with a single Deployment and S
     ```bash
     kubectl apply -f deployment.yml
     kubectl apply -f service.yml
+    kubectl apply -f ingress.yml
     ```
 3.  **Verify the deployment:**
     ```bash
@@ -118,12 +116,13 @@ This setup automatically scales the number of pods based on CPU load.
 
 1.  **Deploy the Base Application First:**
     ```bash
-    kubectl apply -f base/deployment.yaml
-    kubectl apply -f base/service.yaml
+    kubectl apply -f base/deployment.yml
+    kubectl apply -f base/service.yml
+    kubectl apply -f base/ingress.yml
     ```
 2.  **Apply the Horizontal Pod Autoscaler (HPA):**
     ```bash
-    kubectl apply -f autoscaling/hpa.yaml
+    kubectl apply -f autoscaling/hpa.yml
     ```
 3.  **Verify the HPA:**
     ```bash
@@ -138,9 +137,9 @@ Deploy a new version alongside the old one and switch traffic instantly with zer
 1.  **Deploy the Blue Environment:**
     Apply the blue deployment, its service, and the Ingress that points to it.
     ```bash
-    kubectl apply -f blue-green/deployment-blue.yaml
-    kubectl apply -f blue-green/service.yaml
-    kubectl apply -f blue-green/ingress.yaml
+    kubectl apply -f blue-green/deployment-blue.yml
+    kubectl apply -f blue-green/service.yml
+    kubectl apply -f blue-green/ingress.yml
     ```
 2.  **Verify Blue is Live 🔵:**
     Check that the Ingress is routing traffic to the blue services.
@@ -157,7 +156,7 @@ Deploy a new version alongside the old one and switch traffic instantly with zer
 3.  **Deploy the Green Environment:**
     Deploy the new version. This step does not affect live traffic.
     ```bash
-    kubectl apply -f blue-green/deployment-green.yaml
+    kubectl apply -f blue-green/deployment-green.yml
     ```
 4.  **The Switch! Redirect Traffic to Green 🟢:**
     Patch the Ingress to atomically switch traffic to the green services.
@@ -177,26 +176,26 @@ Gradually shift a percentage of traffic to a new version to test it in productio
 
 1.  **Deploy the Primary (Stable) Version:**
     ```bash
-    kubectl apply -f canary/deployment-primary.yaml
-    kubectl apply -f canary/service.yaml
+    kubectl apply -f canary/deployment-stable.yml
+    kubectl apply -f canary/service.yml
     ```
 2.  **Expose the Primary Version:**
     Apply the main Ingress that sends 100% of traffic to the primary version.
     ```bash
-    kubectl apply -f canary/ingress.yaml
+    kubectl apply -f canary/ingress-stable.yml
     ```
 3.  **Deploy the Canary Version:**
     Deploy the new version of your application. It won't receive any traffic yet.
     ```bash
-    kubectl apply -f canary/deployment-canary.yaml
+    kubectl apply -f canary/deployment-canary.yml
     ```
 4.  **Begin the Canary Rollout (10% Traffic):**
     Apply the traffic split configuration. This example assumes you are using a service mesh or an Ingress controller that supports weighted routing (e.g., NGINX with a canary ingress).
     ```bash
-    # This file contains the rules to send 10% of traffic to the canary
-    kubectl apply -f canary/traffic-split.yaml
+    # Deploy the canary ingress that sends 10% of traffic to the new version
+    kubectl apply -f canary/ingress-canary.yml
     ```
-5.  **Monitor the Canary** and gradually increase the traffic percentage by modifying `traffic-split.yaml` until it reaches 100%.
+5.  **Monitor the Canary** and gradually increase the traffic percentage by editing `canary/ingress-canary.yml` (e.g., adjust `nginx.ingress.kubernetes.io/canary-weight`) until it reaches 100%.
 
 ---
 

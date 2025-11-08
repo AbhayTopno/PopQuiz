@@ -28,7 +28,7 @@ const About: React.FC = () => {
       height: '100vh',
       borderRadius: 0,
     });
-  });
+  }, []);
 
   return (
     <div

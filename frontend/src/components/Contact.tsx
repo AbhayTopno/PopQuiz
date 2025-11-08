@@ -14,39 +14,35 @@ const ImageClipBox: React.FC<ImageClipBoxProps> = ({ src, clipClass }) => (
 
 const Contact: React.FC = () => {
   return (
-    <div id="contact" className="my-20 min-h-96 w-screen px-10">
-      <div className="relative rounded-lg bg-black py-24 text-blue-50 sm:overflow-hidden">
-        <div className="absolute -left-20 top-0 hidden h-full w-72 overflow-hidden sm:block lg:left-20 lg:w-96">
+    <div
+      id="contact"
+      className="my-12 sm:my-20 min-h-96 w-full max-w-[1200px] mx-auto px-4 sm:px-10 relative"
+    >
+      <div className="relative rounded-lg bg-black py-16 sm:py-24 text-blue-50 overflow-visible">
+        <div className="absolute -left-32 top-0 hidden h-full w-72 overflow-hidden sm:block sm:w-96 z-10">
           <ImageClipBox
             src="/img/contact-1.webp"
             clipClass="contact-clip-path-1 absolute h-full w-full"
           />
           <ImageClipBox
             src="/img/contact-2.webp"
-            clipClass="contact-clip-path-2 absolute h-full w-full lg:translate-y-40 translate-y-60"
+            clipClass="contact-clip-path-2 absolute h-full w-full translate-y-40"
           />
         </div>
 
-        <div className="absolute -top-40 left-20 w-60 sm:top-1/2 md:left-auto md:right-10 lg:top-20 lg:w-80 h-[400px]">
-          <ImageClipBox
-            src="/img/swordman-partial.webp"
-            clipClass="absolute md:scale-125 h-full w-full"
-          />
-          <ImageClipBox
-            src="/img/swordman.webp"
-            clipClass="sword-man-clip-path md:scale-125 h-full w-full"
-          />
+        <div className="absolute -top-20 -right-10 w-40 h-[250px] sm:-top-10 sm:-right-20 sm:w-60 sm:h-[350px] z-20">
+          <ImageClipBox src="/img/swordman.webp" clipClass="sword-man-clip-path h-full w-full" />
         </div>
 
-        <div className="flex flex-col items-center text-center">
-          <p className="mb-10 font-general text-[10px] uppercase">Join PopQuiz</p>
+        <div className="flex flex-col items-center text-center px-4 relative z-30">
+          <p className="mb-6 sm:mb-10 font-general text-[10px] uppercase">Join PopQuiz</p>
 
           <AnimatedTitle
             title="reach o<b>u</b>t and<br /> sh<b>a</b>re your <br /><b>q</b>uiz i<b>d</b>eas"
-            containerClass="special-font !md:text-[6.2rem] w-full font-zentry !text-5xl !font-black !leading-[.9]"
+            containerClass="special-font !text-3xl sm:!text-[4rem] w-full font-zentry !font-black !leading-[.9]"
           />
 
-          <Button title="contact us" containerClass="mt-10 cursor-pointer" />
+          <Button title="contact us" containerClass="mt-6 sm:mt-10 cursor-pointer" />
         </div>
       </div>
     </div>

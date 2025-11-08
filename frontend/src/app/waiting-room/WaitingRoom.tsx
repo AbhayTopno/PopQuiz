@@ -580,9 +580,15 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       {/* Main Content - 50% Chat / 50% Settings */}
       <div className="flex flex-1 flex-col md:flex-row gap-4 md:gap-6 overflow-hidden">
         {/* Chat Section - 50% on desktop */}
-        <div className="order-2 md:order-1 w-full md:w-1/2 flex flex-col min-h-0">
+        <div className="order-2 md:order-1 w-full md:w-1/2 flex flex-col flex-1 min-h-0">
           <div className="rounded-2xl border border-white/20 bg-white/5 p-4 backdrop-blur flex flex-col h-full min-h-0">
-            <PlayersList players={players} mode={mode} />
+            <PlayersList
+              players={players}
+              mode={mode}
+              isHost={isHost}
+              socket={socket}
+              onKickPlayer={handleKickPlayer}
+            />
             <ChatBox
               messages={messages}
               messageInput={messageInput}
