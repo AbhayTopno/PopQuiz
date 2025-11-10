@@ -28,11 +28,5 @@ COPY --from=builder /usr/src/app/.next/standalone ./
 COPY --from=builder /usr/src/app/.next/static ./.next/static
 COPY --from=builder /usr/src/app/public ./public
 
-# Copy entrypoint script and fix line endings
-COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
-
 EXPOSE 3000
-
-# Use entrypoint to inject runtime config
-ENTRYPOINT ["/bin/sh", "/usr/local/bin/entrypoint.sh"]
+CMD ["node", "server.js"]

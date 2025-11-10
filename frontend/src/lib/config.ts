@@ -11,29 +11,70 @@ declare global {
   }
 }
 
+const LOCAL_HOST_HINTS = ['localhost', '127.0.0.1', '::1'];
+
+const looksInternalHost = (hostname: string) => {
+  const lowered = hostname.toLowerCase();
+  return (
+    LOCAL_HOST_HINTS.includes(lowered) ||
+    lowered.includes('backend') ||
+    lowered.endsWith('.internal')
+  );
+};
+
+const resolveClientUrl = (candidate: string | undefined, fallback: string) => {
+  const value = candidate || fallback;
+
+  try {
+    const url = new URL(value);
+
+    if (!looksInternalHost(url.hostname)) {
+      return url.toString();
+    }
+
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    const path = url.pathname === '/' ? '' : url.pathname;
+    const search = url.search ?? '';
+    const hash = url.hash ?? '';
+
+    if (protocol === 'https:') {
+      return `${window.location.origin}${path}${search}${hash}`;
+    }
+
+    const portSuffix = url.port ? `:${url.port}` : '';
+    return `${url.protocol}//${hostname}${portSuffix}${path}${search}${hash}`;
+  } catch (error) {
+    console.error('Failed to resolve client URL, returning fallback', error);
+    return value;
+  }
+};
+
 export const getApiUrl = () => {
-  // Server-side: use internal API URL for container-to-container communication
+  const fallback = 'http://localhost:5000';
+
   if (typeof window === 'undefined') {
     return (
       process.env.INTERNAL_API_URL ||
       process.env.API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
-      'http://localhost:5000'
+      fallback
     );
   }
-  // Client-side: fetch from runtime config
-  return window.__ENV__?.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+  const runtimeValue = window.__ENV__?.API_URL || process.env.NEXT_PUBLIC_API_URL;
+  return resolveClientUrl(runtimeValue, fallback);
 };
 
 export const getSocketUrl = () => {
-  // Server-side: use env var
+  const fallback = 'http://localhost:5000';
+
   if (typeof window === 'undefined') {
-    return process.env.SOCKET_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
+    return process.env.SOCKET_URL || process.env.NEXT_PUBLIC_SOCKET_URL || fallback;
   }
-  // Client-side: fetch from runtime config
-  return (
-    window.__ENV__?.SOCKET_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000'
-  );
+
+  const runtimeValue = window.__ENV__?.SOCKET_URL || process.env.NEXT_PUBLIC_SOCKET_URL;
+  return resolveClientUrl(runtimeValue, fallback);
 };
 
 // For debugging

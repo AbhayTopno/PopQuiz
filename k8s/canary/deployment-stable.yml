@@ -51,22 +51,13 @@ spec:
     spec:
       containers:
         - name: popquiz-backend
-          image: abhaytopno/popquiz-backend:v5
+          image: abhaytopno/popquiz-backend:v8
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
           envFrom:
             - secretRef:
                 name: backend-secrets
-          env:
-            - name: REDIS_URL
-              value: 'redis://redis:6379'
-            - name: PORT
-              value: '5000'
-            - name: NODE_ENV
-              value: 'production'
-            - name: NEXT_API
-              value: 'https://YOUR_CLUSTER_IP.nip.io'
           resources:
             requests:
               cpu: '100m'
@@ -99,21 +90,13 @@ spec:
     spec:
       containers:
         - name: popquiz-frontend
-          image: abhaytopno/popquiz-frontend:v5
-          imagePullPolicy: IfNotPresent
+          image: abhaytopno/popquiz-frontend:v8
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
-          env:
-            - name: NODE_ENV
-              value: 'production'
-            - name: PORT
-              value: '3000'
-            - name: API_URL
-              value: 'https://YOUR_CLUSTER_IP.nip.io'
-            - name: SOCKET_URL
-              value: 'https://YOUR_CLUSTER_IP.nip.io'
-            - name: INTERNAL_API_URL
-              value: 'http://popquiz-backend-service'
+          envFrom:
+            - configMapRef:
+                name: frontend-secrets
           resources:
             requests:
               cpu: '100m'

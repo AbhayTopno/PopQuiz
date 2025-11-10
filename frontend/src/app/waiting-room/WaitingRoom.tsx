@@ -641,6 +641,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
                 isGenerating={isGenerating}
                 countdown={countdown}
                 topicValid={settings.topic.trim().length > 0}
+                isHost={isHost}
                 onStart={handleLetsGo}
               />
             )}

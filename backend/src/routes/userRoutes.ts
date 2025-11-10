@@ -6,6 +6,7 @@ import {
   logout,
   signup,
   getCurrentUser,
+  updateProfile,
 } from '../controllers/auth.controller.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { authLimiter, apiLimiter } from '../middlewares/rateLimiter.js';
@@ -19,6 +20,7 @@ router.post('/logout', logout);
 
 // Protected routes with general API rate limiting
 router.get('/me', apiLimiter, protect, getCurrentUser);
+router.put('/profile', apiLimiter, protect, updateProfile);
 router.get('/getUser/:id', apiLimiter, getUserById);
 router.get('/getAllUsers', apiLimiter, getAllUsers);
 

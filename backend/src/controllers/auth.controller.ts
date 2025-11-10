@@ -66,6 +66,101 @@ const logout = asyncHandler(async (req: Request, res: Response) => {
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
+interface UpdateProfileBody {
+  username?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}
+
+const updateProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!req.user) {
+    res.status(401);
+    throw new Error('Not authenticated');
+  }
+
+  const { username, currentPassword, newPassword }: UpdateProfileBody = req.body || {};
+
+  if (!username || typeof username !== 'string') {
+    res.status(400);
+    throw new Error('Username is required');
+  }
+
+  const normalizedUsername = username.trim();
+
+  if (!normalizedUsername) {
+    res.status(400);
+    throw new Error('Username cannot be empty');
+  }
+
+  if (normalizedUsername.length < 3) {
+    res.status(400);
+    throw new Error('Username must be at least 3 characters long');
+  }
+
+  const userRecord = await User.findById(req.user._id);
+
+  if (!userRecord) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  if (normalizedUsername.toLowerCase() !== userRecord.username.toLowerCase()) {
+    const existingUser = await User.findOne({
+      username: normalizedUsername,
+      _id: { $ne: userRecord._id },
+    });
+
+    if (existingUser) {
+      res.status(400);
+      throw new Error('Username is already taken');
+    }
+  }
+
+  userRecord.username = normalizedUsername;
+
+  const wantsPasswordChange = Boolean(currentPassword || newPassword);
+
+  if (wantsPasswordChange) {
+    if (!currentPassword || !newPassword) {
+      res.status(400);
+      throw new Error('Current and new passwords are required to change password');
+    }
+
+    if (newPassword.length < 8) {
+      res.status(400);
+      throw new Error('New password must be at least 8 characters long');
+    }
+
+    const passwordMatches = await bcrypt.compare(currentPassword, userRecord.password);
+
+    if (!passwordMatches) {
+      res.status(400);
+      throw new Error('Current password is incorrect');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    userRecord.password = hashedPassword;
+  }
+
+  await userRecord.save();
+
+  req.user = {
+    _id: userRecord._id.toString(),
+    username: userRecord.username,
+    email: userRecord.email,
+    isAdmin: userRecord.isAdmin,
+    profilePic: userRecord.profilePic,
+  };
+
+  res.json({
+    _id: userRecord._id,
+    username: userRecord.username,
+    email: userRecord.email,
+    isAdmin: userRecord.isAdmin,
+    profilePic: userRecord.profilePic,
+  });
+});
+
 const getUserById = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findById(req.params.id).select('-password');
 
@@ -108,4 +203,4 @@ const getCurrentUser = asyncHandler(async (req: AuthRequest, res: Response) => {
   }
 });
 
-export { signup, login, logout, getUserById, getAllUsers, getCurrentUser };
+export { signup, login, logout, getUserById, getAllUsers, getCurrentUser, updateProfile };

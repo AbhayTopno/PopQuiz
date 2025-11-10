@@ -66,13 +66,19 @@ export interface User {
   avatar?: string;
 }
 
+export interface UpdateProfileInput {
+  username: string;
+  currentPassword?: string;
+  newPassword?: string;
+}
+
 export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => Promise<void>;
+  updateProfile: (data: UpdateProfileInput) => Promise<void>;
   currentUser: () => Promise<void>;
 }
 
@@ -108,8 +114,8 @@ export interface ChatMessage {
 export interface QuizSettings {
   topic: string;
   difficulty: string;
-  questionCount: number;
-  duration: number;
+  questionCount: number | '';
+  duration: number | '';
 }
 
 export interface TeamAssignments {
@@ -201,6 +207,7 @@ export interface StartButtonProps {
   isGenerating: boolean;
   countdown: number | null;
   topicValid: boolean;
+  isHost: boolean;
   onStart: () => void;
 }
 

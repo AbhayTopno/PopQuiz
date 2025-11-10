@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User, AuthContextType } from '../types';
+import { User, AuthContextType, UpdateProfileInput } from '../types';
 import { getApiUrl } from '@/lib/config';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -97,17 +97,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateProfile = async (data: Partial<User>) => {
+  const updateProfile = async (data: UpdateProfileInput) => {
     try {
+      const payload: UpdateProfileInput = {
+        username: data.username.trim(),
+      };
+
+      if (data.currentPassword) {
+        payload.currentPassword = data.currentPassword;
+      }
+
+      if (data.newPassword) {
+        payload.newPassword = data.newPassword;
+      }
+
       const response = await fetch(`${getApiUrl()}/api/auth/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        throw new Error('Profile update failed');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Profile update failed');
       }
 
       const updatedUser = await response.json();
