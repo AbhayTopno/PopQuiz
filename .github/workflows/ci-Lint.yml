@@ -59,8 +59,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create dummy .env files from examples
         run: |
-          cp frontend/.env.example frontend/.env
-          cp backend/.env.example backend/.env
+          cp docker-compose/.env.example.frontend.development docker-compose/.env.frontend
+          cp docker-compose/.env.example.backend.development docker-compose/.env.backend
       - name: Lint Dockerfiles with Hadolint
         run: |
           docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 frontend/docker/Dockerfile.dev

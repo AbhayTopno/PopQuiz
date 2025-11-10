@@ -8,7 +8,7 @@ services:
     ports:
       - '5000:5000'
     env_file:
-      - ../backend/.env
+      - .env.backend
     volumes:
       - ../backend:/usr/src/app:cached # Mount backend source code
       - /usr/src/app/node_modules # Prevent overwriting node_modules
@@ -27,7 +27,7 @@ services:
     ports:
       - '3000:3000'
     env_file:
-      - ../frontend/.env
+      - .env.frontend
     volumes:
       - ../frontend:/usr/src/app:cached # Mount frontend code for live reload
       - /usr/src/app/node_modules # Prevent overwriting node_modules
