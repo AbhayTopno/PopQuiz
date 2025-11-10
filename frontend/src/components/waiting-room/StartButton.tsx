@@ -8,8 +8,13 @@ export default function StartButton({
   isGenerating,
   countdown,
   topicValid,
+  isHost,
   onStart,
 }: StartButtonProps) {
+  if (!isHost) {
+    return null;
+  }
+
   const isDisabled = () => {
     if (isGenerating || !topicValid) return true;
 

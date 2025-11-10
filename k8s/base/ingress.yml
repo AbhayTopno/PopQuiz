@@ -13,7 +13,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: YOUR_CLUSTER_IP.nip.io
+    - host: 34.14.161.90.nip.io
       http:
         paths:
           - path: /api

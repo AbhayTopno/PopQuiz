@@ -7,21 +7,86 @@ import * as redisService from './redisService.js';
 import { socketAuthMiddleware } from '../middlewares/socketAuthMiddleware.js';
 import type { AuthSocket } from '../middlewares/socketAuthMiddleware.js';
 
+// Helper functions for co-op mode
+const getCoopData = async (key: string): Promise<string | null> => {
+  const { getRedisClient } = await import('../config/redis.js');
+  const redis = getRedisClient();
+  return await redis.get(key);
+};
+
+const setCoopData = async (key: string, value: string, ttl = 7200): Promise<void> => {
+  const { getRedisClient } = await import('../config/redis.js');
+  const redis = getRedisClient();
+  await redis.set(key, value);
+  await redis.expire(key, ttl);
+};
+
 export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
+  const escapeRegexSpecials = (value: string) => value.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&');
+
+  const buildCorsValidator = () => {
+    const raw = process.env.CORS_ORIGIN;
+
+    if (!raw) {
+      return (
+        origin: string | undefined,
+        callback: (_error: Error | null, _allow?: boolean) => void,
+      ) => callback(null, true);
+    }
+
+    const origins = raw
+      .split(',')
+      .map((originValue) => originValue.trim())
+      .filter(Boolean);
+
+    const hasWildcard = origins.includes('*');
+
+    const matchesOrigin = (value: string) =>
+      origins.some((allowed) => {
+        if (allowed === '*') {
+          return true;
+        }
+
+        if (allowed.includes('*')) {
+          const pattern = `^${escapeRegexSpecials(allowed).replace(/\\\*/g, '.*')}$`;
+          return new RegExp(pattern, 'i').test(value.toLowerCase());
+        }
+
+        return allowed.toLowerCase() === value.toLowerCase();
+      });
+
+    return (
+      origin: string | undefined,
+      callback: (_error: Error | null, _allow?: boolean) => void,
+    ) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (hasWildcard || matchesOrigin(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} not allowed by Socket.IO CORS policy`));
+    };
+  };
+
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.NEXT_API,
+      origin: buildCorsValidator(),
       credentials: true,
+      methods: ['GET', 'POST'],
     },
     pingTimeout: 60000,
     pingInterval: 25000,
+    transports: ['websocket', 'polling'],
   });
 
   // Attach authentication middleware so we can identify users by JWT cookie
   io.use((socket, next) => socketAuthMiddleware(socket as unknown as AuthSocket, next));
 
   io.on('connection', (socket: AuthSocket) => {
-    console.log(`🔌 Client connected: ${socket.id}`);
+    console.log(`🔌 Socket.IO client connected: ${socket.id}`);
 
     // Join a quiz room
     socket.on(
@@ -135,8 +200,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           };
           await redisService.addChatMessage(roomId, systemMessage);
           io.to(roomId).emit('chat-message', systemMessage);
-
-          console.log(`👤 ${effectiveUsername} joined room ${roomId}`);
         } catch (error) {
           console.error('Error in join-room:', error);
           socket.emit('error', { message: 'Failed to join room' });
@@ -362,8 +425,7 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
     // Handle disconnection
     socket.on('disconnect', async () => {
-      console.log(`🔌 Client disconnected: ${socket.id}`);
-
+      console.log(`🔌 Socket.IO client disconnected: ${socket.id}`);
       try {
         // Find and remove player from all rooms
         const roomIds = await redisService.getAllRoomIds();
@@ -400,7 +462,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
                   const count = await redisService.getPlayerCount(roomId);
                   if (count === 0) {
                     await redisService.deleteRoom(roomId);
-                    console.log(`🗑️  Deleted empty room: ${roomId}`);
                   }
                 },
                 5 * 60 * 1000,
@@ -463,8 +524,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           username: player.username,
           remainingPlayers,
         });
-
-        console.log(`🚫 Player ${player.username} (${playerId}) was kicked from room ${roomId}`);
       } catch (error) {
         console.error('Error in kick-player:', error);
       }
@@ -481,7 +540,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           const { roomId, settings } = data;
           // Broadcast updated settings to all players in the room
           io.to(roomId).emit('settings:update', settings);
-          console.log(`⚙️  Settings updated in room ${roomId}:`, settings);
         } catch (error) {
           console.error('Error in settings:update:', error);
         }
@@ -496,8 +554,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
         // Broadcast quiz start to all players
         io.to(roomId).emit('quiz:start', { quizId, duration });
-
-        console.log(`🎮 Quiz started in room ${roomId}: ${quizId}`);
       } catch (error) {
         console.error('Error in quiz:start:', error);
         socket.emit('error', { message: 'Failed to start quiz' });
@@ -519,7 +575,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           } else {
             clearInterval(countdownInterval);
             io.to(roomId).emit('quiz:start', { quizId, duration });
-            console.log(`⚔️  Versus battle started in room ${roomId}: ${quizId}`);
           }
         }, 1000);
       } catch (error) {
@@ -542,9 +597,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           let player = await redisService.getPlayer(roomId, socket.id);
 
           if (!player) {
-            console.log(
-              `⚠️  Player not found in Redis during score-update, adding now... (${socket.id})`,
-            );
             // Player might not be in Redis yet, try to find username from connection
             const username = 'Player'; // Fallback
             player = {
@@ -576,10 +628,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
           // Emit to everyone in the room (synchronous like chat)
           io.to(roomId).emit('score-update-broadcast', scoreUpdateData);
-
-          console.log(
-            `📊 Score synced to Redis: ${player.username} - ${score} pts (Q${currentQuestion}) → Broadcasting to room ${roomId}`,
-          );
         } catch (error) {
           console.error('Error in score-update:', error);
         }
@@ -615,8 +663,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
                 score: p.score,
               })),
             });
-
-            console.log(`⚔️  1v1 Battle completed in room ${roomId}`);
           }
         } catch (error) {
           console.error('Error in player-finished:', error);
@@ -684,9 +730,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
           // Broadcast updated team assignments to all players in the room
           io.to(roomId).emit('team-assignments', teamAssignments);
-
-          console.log(`👥 Team assignments updated in room ${roomId}:`, teamAssignments);
-          console.log(`👥 Username-based assignments:`, usernameAssignments);
         } catch (error) {
           console.error('Error in update-team-assignments:', error);
         }
@@ -761,11 +804,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             usernameAssignments &&
             (usernameAssignments.teamA.length > 0 || usernameAssignments.teamB.length > 0)
           ) {
-            console.log(
-              `📋 Found username-based team assignments for room ${roomId}:`,
-              usernameAssignments,
-            );
-
             // Map usernames to current socket IDs
             const newTeamAssignments = {
               teamA: players
@@ -779,7 +817,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             // Update team assignments with current socket IDs
             teamAssignments = newTeamAssignments;
             await redisService.setTeamAssignments(roomId, teamAssignments);
-            console.log(`✅ Rebuilt team assignments from usernames:`, teamAssignments);
           }
 
           // Clean up stale socket IDs of disconnected players
@@ -791,9 +828,7 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             // Remove disconnected players' socket IDs but keep team structure
             teamAssignments.teamA = teamAssignments.teamA.filter((id) => currentIds.includes(id));
             teamAssignments.teamB = teamAssignments.teamB.filter((id) => currentIds.includes(id));
-
             await redisService.setTeamAssignments(roomId, teamAssignments);
-            console.log(`🧹 Cleaned up stale socket IDs for room ${roomId}`, teamAssignments);
           }
 
           // Re-fetch team assignments to ensure we have the latest state (handles race conditions)
@@ -804,23 +839,13 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
           // Check if current player is in team assignments, if not, assign them
           let myTeamId: 'teamA' | 'teamB';
-          console.log(
-            `🔍 Checking assignment for ${effectiveUsername} (${socket.id}). Current assignments:`,
-            { teamA: teamAssignments.teamA, teamB: teamAssignments.teamB },
-          );
 
           if (teamAssignments.teamA.includes(socket.id)) {
             myTeamId = 'teamA';
-            console.log(`✅ ${effectiveUsername} already in teamA`);
           } else if (teamAssignments.teamB.includes(socket.id)) {
             myTeamId = 'teamB';
-            console.log(`✅ ${effectiveUsername} already in teamB`);
           } else {
             // Player not in any team, assign to smaller team based on team assignment array lengths
-            console.log(
-              `🆕 ${effectiveUsername} not in any team. TeamA size: ${teamAssignments.teamA.length}, TeamB size: ${teamAssignments.teamB.length}`,
-            );
-
             // Re-fetch one more time right before assignment to minimize race condition
             const latestAssignments = (await redisService.getTeamAssignments(roomId)) || {
               teamA: [],
@@ -831,32 +856,24 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             if (latestAssignments.teamA.includes(socket.id)) {
               myTeamId = 'teamA';
               teamAssignments = latestAssignments;
-              console.log(`✅ ${effectiveUsername} was concurrently assigned to teamA`);
             } else if (latestAssignments.teamB.includes(socket.id)) {
               myTeamId = 'teamB';
               teamAssignments = latestAssignments;
-              console.log(`✅ ${effectiveUsername} was concurrently assigned to teamB`);
             } else {
               // Still not assigned, proceed with assignment
               if (latestAssignments.teamA.length <= latestAssignments.teamB.length) {
                 myTeamId = 'teamA';
                 if (!latestAssignments.teamA.includes(socket.id)) {
                   latestAssignments.teamA.push(socket.id);
-                  console.log(`➕ Added ${effectiveUsername} (${socket.id}) to teamA`);
                 }
               } else {
                 myTeamId = 'teamB';
                 if (!latestAssignments.teamB.includes(socket.id)) {
                   latestAssignments.teamB.push(socket.id);
-                  console.log(`➕ Added ${effectiveUsername} (${socket.id}) to teamB`);
                 }
               }
               await redisService.setTeamAssignments(roomId, latestAssignments);
               teamAssignments = latestAssignments;
-              console.log(
-                `✅ Assigned ${effectiveUsername} (${socket.id}) to ${myTeamId}. New assignments:`,
-                teamAssignments,
-              );
             }
           }
 
@@ -908,8 +925,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           };
           await redisService.addChatMessage(roomId, systemMessage);
           io.to(roomId).emit('chat-message', systemMessage);
-
-          console.log(`👥 ${effectiveUsername} joined 2v2 room ${roomId} on ${myTeamId}`);
         } catch (error) {
           console.error('Error in join-2v2-room:', error);
           socket.emit('error', { message: 'Failed to join 2v2 room' });
@@ -949,11 +964,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             console.error(
               `⚠️  Player ${socket.id} tried to submit for ${teamId} but is not in that team`,
             );
-            console.log('Team assignments:', teamAssignments);
-            console.log(
-              'All players:',
-              players.map((p) => ({ id: p.id, username: p.username })),
-            );
             return;
           }
 
@@ -986,10 +996,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             answer,
             isCorrect,
           });
-
-          console.log(
-            `📊 Player ${socket.id} from ${teamId} answered Q${currentQuestion}: ${isCorrect ? 'Correct' : 'Wrong'} (+${points} pts) - Team Total: ${newTeamScore}`,
-          );
         } catch (error) {
           console.error('Error in submit-team-answer:', error);
         }
@@ -1033,35 +1039,13 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             })),
           });
 
-          console.log(`🏁 ${teamId} finished with score: ${teamScore}`);
-
           // Check if both teams finished
           const allPlayers = await redisService.getAllPlayers(roomId);
           const teamAMembers = allPlayers.filter((p) => teamAssignments.teamA.includes(p.id));
           const teamBMembers = allPlayers.filter((p) => teamAssignments.teamB.includes(p.id));
 
-          console.log(`🔍 Checking if both teams finished:`);
-          console.log(
-            `   Team A members: ${teamAMembers.length} (${teamAMembers.map((p) => p.username).join(', ')})`,
-          );
-          console.log(
-            `   Team A ready: ${teamAMembers.map((p) => `${p.username}:${p.isReady}`).join(', ')}`,
-          );
-          console.log(
-            `   Team B members: ${teamBMembers.length} (${teamBMembers.map((p) => p.username).join(', ')})`,
-          );
-          console.log(
-            `   Team B ready: ${teamBMembers.map((p) => `${p.username}:${p.isReady}`).join(', ')}`,
-          );
-          console.log(
-            `   All players in room: ${allPlayers.length} (${allPlayers.map((p) => p.username).join(', ')})`,
-          );
-          console.log(`   Team assignments:`, teamAssignments);
-
           const teamAFinished = teamAMembers.length > 0 && teamAMembers.every((p) => p.isReady);
           const teamBFinished = teamBMembers.length > 0 && teamBMembers.every((p) => p.isReady);
-
-          console.log(`   Team A finished: ${teamAFinished}, Team B finished: ${teamBFinished}`);
 
           if (teamAFinished && teamBFinished) {
             // Get shared team scores (not sum of individual scores)
@@ -1095,7 +1079,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
             // Broadcast battle complete
             io.to(roomId).emit('2v2-battle-complete', { teams });
-            console.log(`⚔️  2v2 Battle completed in room ${roomId}`);
           }
         }
       } catch (error) {
@@ -1118,7 +1101,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           } else {
             clearInterval(countdownInterval);
             io.to(roomId).emit('quiz:start', { quizId, duration });
-            console.log(`⚔️  2v2 battle started in room ${roomId}: ${quizId}`);
           }
         }, 1000);
       } catch (error) {
@@ -1197,11 +1179,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             usernameAssignments &&
             (usernameAssignments.teamA.length > 0 || usernameAssignments.teamB.length > 0)
           ) {
-            console.log(
-              `📋 Found username-based team assignments for custom room ${roomId}:`,
-              usernameAssignments,
-            );
-
             // Map usernames to current socket IDs
             const newTeamAssignments = {
               teamA: players
@@ -1214,7 +1191,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
             teamAssignments = newTeamAssignments;
             await redisService.setTeamAssignments(roomId, teamAssignments);
-            console.log(`✅ Rebuilt custom team assignments from usernames:`, teamAssignments);
           }
 
           // Clean up stale socket IDs
@@ -1226,10 +1202,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             teamAssignments.teamA = teamAssignments.teamA.filter((id) => currentIds.includes(id));
             teamAssignments.teamB = teamAssignments.teamB.filter((id) => currentIds.includes(id));
             await redisService.setTeamAssignments(roomId, teamAssignments);
-            console.log(
-              `🧹 Cleaned up stale socket IDs for custom room ${roomId}`,
-              teamAssignments,
-            );
           }
 
           // Re-fetch team assignments
@@ -1240,23 +1212,13 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
           // Check if current player is in team assignments
           let myTeamId: 'teamA' | 'teamB';
-          console.log(
-            `🔍 Checking assignment for ${effectiveUsername} (${socket.id}) in custom room. Current assignments:`,
-            { teamA: teamAssignments.teamA, teamB: teamAssignments.teamB },
-          );
 
           if (teamAssignments.teamA.includes(socket.id)) {
             myTeamId = 'teamA';
-            console.log(`✅ ${effectiveUsername} already in teamA`);
           } else if (teamAssignments.teamB.includes(socket.id)) {
             myTeamId = 'teamB';
-            console.log(`✅ ${effectiveUsername} already in teamB`);
           } else {
             // Player not in any team, assign to smaller team (default balancing)
-            console.log(
-              `🆕 ${effectiveUsername} not in any team. TeamA size: ${teamAssignments.teamA.length}, TeamB size: ${teamAssignments.teamB.length}`,
-            );
-
             const latestAssignments = (await redisService.getTeamAssignments(roomId)) || {
               teamA: [],
               teamB: [],
@@ -1265,32 +1227,24 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             if (latestAssignments.teamA.includes(socket.id)) {
               myTeamId = 'teamA';
               teamAssignments = latestAssignments;
-              console.log(`✅ ${effectiveUsername} was concurrently assigned to teamA`);
             } else if (latestAssignments.teamB.includes(socket.id)) {
               myTeamId = 'teamB';
               teamAssignments = latestAssignments;
-              console.log(`✅ ${effectiveUsername} was concurrently assigned to teamB`);
             } else {
               // Assign to smaller team
               if (latestAssignments.teamA.length <= latestAssignments.teamB.length) {
                 myTeamId = 'teamA';
                 if (!latestAssignments.teamA.includes(socket.id)) {
                   latestAssignments.teamA.push(socket.id);
-                  console.log(`➕ Added ${effectiveUsername} (${socket.id}) to teamA`);
                 }
               } else {
                 myTeamId = 'teamB';
                 if (!latestAssignments.teamB.includes(socket.id)) {
                   latestAssignments.teamB.push(socket.id);
-                  console.log(`➕ Added ${effectiveUsername} (${socket.id}) to teamB`);
                 }
               }
               await redisService.setTeamAssignments(roomId, latestAssignments);
               teamAssignments = latestAssignments;
-              console.log(
-                `✅ Assigned ${effectiveUsername} (${socket.id}) to ${myTeamId}. New assignments:`,
-                teamAssignments,
-              );
             }
           }
 
@@ -1342,8 +1296,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           };
           await redisService.addChatMessage(roomId, systemMessage);
           io.to(roomId).emit('chat-message', systemMessage);
-
-          console.log(`⚙️  ${effectiveUsername} joined custom room ${roomId} on ${myTeamId}`);
         } catch (error) {
           console.error('Error in join-custom-room:', error);
           socket.emit('error', { message: 'Failed to join custom room' });
@@ -1366,7 +1318,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           } else {
             clearInterval(countdownInterval);
             io.to(roomId).emit('quiz:start', { quizId, duration });
-            console.log(`⚙️  Custom battle started in room ${roomId}: ${quizId}`);
           }
         }, 1000);
       } catch (error) {
@@ -1376,18 +1327,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     });
 
     // ===== CO-OP MODE HANDLERS =====
-
-    // Helper to get/set co-op data (using redis client directly like team assignments)
-    const getCoopData = async (key: string): Promise<string | null> => {
-      const redis = await import('../config/redis.js').then((m) => m.getRedisClient());
-      return await redis.get(key);
-    };
-
-    const setCoopData = async (key: string, value: string, ttl = 7200): Promise<void> => {
-      const redis = await import('../config/redis.js').then((m) => m.getRedisClient());
-      await redis.set(key, value);
-      await redis.expire(key, ttl);
-    };
 
     // Join co-op room
     socket.on(
@@ -1435,8 +1374,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             members,
             score: parseInt(teamScore, 10),
           });
-
-          console.log(`🤝 ${effectiveUsername} joined co-op room ${roomId}`);
         } catch (error) {
           console.error('Error in join-coop-room:', error);
           socket.emit('error', { message: 'Failed to join co-op room' });
@@ -1490,10 +1427,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             answer,
             isCorrect,
           });
-
-          console.log(
-            `🤝 Co-op answer in room ${roomId} by ${playerName}: ${isCorrect ? 'correct' : 'incorrect'}, +${points} points`,
-          );
         } catch (error) {
           console.error('Error in submit-coop-answer:', error);
         }
@@ -1520,8 +1453,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           finalScore,
           members,
         });
-
-        console.log(`🤝 Co-op quiz completed in room ${roomId}. Final Score: ${finalScore}`);
       } catch (error) {
         console.error('Error in coop-quiz-finished:', error);
       }
@@ -1546,7 +1477,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           } else {
             clearInterval(countdownInterval);
             io.to(roomId).emit('quiz:start', { quizId, duration });
-            console.log(`🤝 Co-op quiz started in room ${roomId}: ${quizId}`);
           }
         }, 1000);
       } catch (error) {
@@ -1579,7 +1509,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
               joinedAt: Date.now(),
             };
             await redisService.addPlayer(roomId, player);
-            console.log(`🎮 ${username} joined FFA room ${roomId}`);
           }
 
           // Join socket room
@@ -1623,7 +1552,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           } else {
             clearInterval(countdownInterval);
             io.to(roomId).emit('quiz:start', { quizId, duration });
-            console.log(`🎮 FFA battle started in room ${roomId}: ${quizId}`);
           }
         }, 1000);
       } catch (error) {
@@ -1646,9 +1574,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
           let player = await redisService.getPlayer(roomId, socket.id);
 
           if (!player) {
-            console.log(
-              `⚠️  Player not found in Redis during ffa-score-update, adding now... (${socket.id})`,
-            );
             const username = 'Player'; // Fallback
             player = {
               id: socket.id,
@@ -1679,10 +1604,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
           // Emit to everyone in the room for real-time leaderboard
           io.to(roomId).emit('ffa-score-update', scoreUpdateData);
-
-          console.log(
-            `📊 FFA Score synced: ${player.username} - ${score} pts (Q${currentQuestion}) → Room ${roomId}`,
-          );
         } catch (error) {
           console.error('Error in ffa-score-update:', error);
         }
@@ -1709,8 +1630,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             score,
           });
 
-          console.log(`✅ ${username} finished FFA in room ${roomId} with ${score} points`);
-
           // Check if all players finished
           const players = await redisService.getAllPlayers(roomId);
           const allFinished = players.every((p) => p.isReady);
@@ -1730,8 +1649,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
             io.to(roomId).emit('ffa-battle-complete', {
               players: sortedPlayers,
             });
-
-            console.log(`🎮 FFA Battle completed in room ${roomId}`);
           }
         } catch (error) {
           console.error('Error in ffa-player-finished:', error);
@@ -1770,10 +1687,7 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
   setInterval(
     async () => {
       try {
-        const cleaned = await redisService.cleanupEmptyRooms();
-        if (cleaned > 0) {
-          console.log(`🗑️  Cleaned up ${cleaned} empty rooms`);
-        }
+        await redisService.cleanupEmptyRooms();
       } catch (error) {
         console.error('Error in cleanup:', error);
       }
@@ -1781,7 +1695,6 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     60 * 60 * 1000,
   );
 
-  console.log('✅ Socket.IO initialized');
   return io;
 }
 

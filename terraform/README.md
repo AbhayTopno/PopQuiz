@@ -196,10 +196,10 @@ kubectl create namespace popquiz
 # Install ingress controller (if not already installed)
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
 
-# Create secrets
-kubectl create secret generic backend-secrets \
-  --from-env-file=k8s/.env.backend \
-  --namespace=popquiz
+# Create secrets for the backend (e.g., database credentials)
+kubectl create secret generic backend-secrets --namespace popquiz --from-env-file=.env.backend
+# Create a configmap for the frontend (e.g., API URLs)
+kubectl create configmap frontend-secrets --namespace popquiz --from-env-file=.env.frontend
 
 # Deploy application
 kubectl apply -f k8s/base/

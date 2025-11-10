@@ -49,12 +49,31 @@ Follow these initial setup steps before trying any of the deployment strategies.
     kubectl create namespace popquiz
     ```
 
-3.  **Create Application Configuration**
+3.  **Deploy the Ingress Controller**
+    Before you can expose your application via Ingress, you need an Ingress Controller — a component that watches Ingress resources and routes external traffic to your services.
+
+    ```bash
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+    ```
+
+    ⏳ Note:
+
+    - It can take a few minutes for the NGINX controller pods and service to become active.
+    - You can check the status using:
+
+    ```bash
+    kubectl get pods -n ingress-nginx
+    kubectl get svc -n ingress-nginx
+    ```
+
+4.  **Create Application Configuration**
     Create the necessary Kubernetes Secrets and ConfigMaps from your local `.env` files.
 
     ```bash
     # Create secrets for the backend (e.g., database credentials)
     kubectl create secret generic backend-secrets --namespace popquiz --from-env-file=.env.backend
+    # Create a configmap for the frontend (e.g., API URLs)
+    kubectl create configmap frontend-secrets --namespace popquiz --from-env-file=.env.frontend
     ```
 
 ---

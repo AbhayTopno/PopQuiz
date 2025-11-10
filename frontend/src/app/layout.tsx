@@ -19,9 +19,13 @@ export default function RootLayout({
 }>) {
   // Inject runtime config from server-side env vars
   const runtimeConfig = {
-    API_URL: process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+    API_URL:
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.API_URL ||
+      process.env.INTERNAL_API_URL ||
+      'http://localhost:5000',
     SOCKET_URL:
-      process.env.SOCKET_URL || process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000',
+      process.env.NEXT_PUBLIC_SOCKET_URL || process.env.SOCKET_URL || 'http://localhost:5000',
   };
 
   return (

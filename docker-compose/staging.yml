@@ -8,11 +8,9 @@ services:
     container_name: myapp_backend_prod
     restart: unless-stopped
     env_file:
-      - ../backend/.env
+      - .env.backend
     ports:
       - '5000:5000'
-    environment:
-      - REDIS_URL=redis://redis:6379
     networks:
       - myapp-network
     depends_on:
@@ -22,16 +20,10 @@ services:
     build:
       context: ../frontend
       dockerfile: docker/Dockerfile
-      target: production
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_DOCKER_BACKEND_API: ${NEXT_PUBLIC_DOCKER_BACKEND_API}
     container_name: myapp_frontend_prod
     restart: unless-stopped
     env_file:
-      - ../frontend/.env
-    environment:
-      - NODE_ENV=production
+      - .env.frontend
     ports:
       - '3000:3000'
     depends_on:

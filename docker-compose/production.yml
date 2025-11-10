@@ -2,12 +2,10 @@
 services:
   backend:
     container_name: production_backend
-    image: abhaytopno/popquiz-backend:v5
+    image: abhaytopno/popquiz-backend:v8
     restart: unless-stopped
     env_file:
-      - ../backend/.env
-    environment:
-      - REDIS_URL=redis://redis:6379
+      - .env.backend
     ports:
       - '5000:5000'
     networks:
@@ -17,12 +15,10 @@ services:
 
   frontend:
     container_name: production_frontend
-    image: abhaytopno/popquiz-frontend:v5
+    image: abhaytopno/popquiz-frontend:v8
     restart: unless-stopped
     env_file:
-      - ../frontend/.env
-    environment:
-      - NODE_ENV=production
+      - .env.frontend
     ports:
       - '3000:3000'
     depends_on:
