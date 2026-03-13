@@ -1,111 +1,128 @@
+import type { Redis } from 'ioredis';
 import { getRedisClient } from '../config/redis.js';
 import type { ChatMessage, Player, Room } from '../types/index.js';
 
-/**
- * Redis Service for managing quiz battle room data
- * Handles chat messages, player scores, and room state
- */
-
-// Redis Key Prefixes
+// Keys
 const ROOM_KEY = 'room:';
-const CHAT_KEY = 'chat:';
 const PLAYERS_KEY = 'players:';
 const LEADERBOARD_KEY = 'leaderboard:';
+const CHAT_KEY = 'chat:';
 const TEAM_ASSIGNMENTS_KEY = 'team-assignments:';
+const TEAM_A_SCORE_KEY = 'teamA-score:';
+const TEAM_B_SCORE_KEY = 'teamB-score:';
 
-// TTL (Time To Live) in seconds
 const ROOM_TTL = 24 * 60 * 60; // 24 hours
-const CHAT_TTL = 24 * 60 * 60; // 24 hours
 
-/**
- * Store room metadata
- */
+// Helper
+const getRedis = (): Redis => getRedisClient();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rooms
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const createRoom = async (roomData: {
   roomId: string;
   quizId: string;
   createdAt: number;
   mode?: string;
 }): Promise<void> => {
-  const redis = getRedisClient();
-  const roomKey = `${ROOM_KEY}${roomData.roomId}`;
-
-  await redis.hmset(roomKey, {
+  const redis = getRedis();
+  const key = `${ROOM_KEY}${roomData.roomId}`;
+  await redis.hmset(key, {
     roomId: roomData.roomId,
     quizId: roomData.quizId,
     createdAt: roomData.createdAt.toString(),
     gameStarted: 'false',
     gameFinished: 'false',
-    mode: roomData.mode || '1v1',
+    mode: roomData.mode ?? '1v1',
   });
-
-  await redis.expire(roomKey, ROOM_TTL);
+  await redis.expire(key, ROOM_TTL);
 };
 
-/**
- * Get room metadata
- */
 export const getRoom = async (roomId: string): Promise<Partial<Room> | null> => {
-  const redis = getRedisClient();
-  const roomKey = `${ROOM_KEY}${roomId}`;
-
-  const roomData = await redis.hgetall(roomKey);
-
-  if (!roomData || Object.keys(roomData).length === 0) {
-    return null;
-  }
-
+  const data = await getRedis().hgetall(`${ROOM_KEY}${roomId}`);
+  if (!data || Object.keys(data).length === 0) return null;
   return {
-    roomId: roomData.roomId,
-    quizId: roomData.quizId,
-    createdAt: parseInt(roomData.createdAt, 10),
-    gameStarted: roomData.gameStarted === 'true',
-    gameFinished: roomData.gameFinished === 'true',
-    mode: roomData.mode || '1v1',
+    roomId: data.roomId,
+    quizId: data.quizId,
+    createdAt: parseInt(data.createdAt, 10),
+    gameStarted: data.gameStarted === 'true',
+    gameFinished: data.gameFinished === 'true',
+    mode: data.mode ?? '1v1',
   };
 };
 
-/**
- * Update room game status
- */
 export const updateRoomStatus = async (
   roomId: string,
   status: { gameStarted?: boolean; gameFinished?: boolean },
 ): Promise<void> => {
-  const redis = getRedisClient();
-  const roomKey = `${ROOM_KEY}${roomId}`;
-
   const updates: Record<string, string> = {};
-  if (status.gameStarted !== undefined) {
-    updates.gameStarted = status.gameStarted.toString();
-  }
-  if (status.gameFinished !== undefined) {
-    updates.gameFinished = status.gameFinished.toString();
-  }
-
-  await redis.hmset(roomKey, updates);
+  if (status.gameStarted !== undefined) updates.gameStarted = status.gameStarted.toString();
+  if (status.gameFinished !== undefined) updates.gameFinished = status.gameFinished.toString();
+  await getRedis().hmset(`${ROOM_KEY}${roomId}`, updates);
 };
 
-/**
- * Check if room exists
- */
 export const roomExists = async (roomId: string): Promise<boolean> => {
-  const redis = getRedisClient();
-  const roomKey = `${ROOM_KEY}${roomId}`;
-  const exists = await redis.exists(roomKey);
-  return exists === 1;
+  return (await getRedis().exists(`${ROOM_KEY}${roomId}`)) === 1;
 };
 
-/**
- * Add a player to a room
- */
-export const addPlayer = async (roomId: string, player: Player): Promise<void> => {
-  const redis = getRedisClient();
-  const playersKey = `${PLAYERS_KEY}${roomId}`;
+export const deleteRoom = async (roomId: string): Promise<void> => {
+  const redis = getRedis();
+  await redis.del(`${ROOM_KEY}${roomId}`);
+  await redis.del(`${PLAYERS_KEY}${roomId}`);
+  await redis.del(`${LEADERBOARD_KEY}${roomId}`);
+  await redis.del(`${CHAT_KEY}${roomId}`);
+  await redis.del(`${TEAM_ASSIGNMENTS_KEY}${roomId}`);
+  await redis.del(`${TEAM_ASSIGNMENTS_KEY}${roomId}:usernames`);
+  await redis.del(`${TEAM_A_SCORE_KEY}${roomId}`);
+  await redis.del(`${TEAM_B_SCORE_KEY}${roomId}`);
+};
 
-  const playerData = {
+export const getAllRoomIds = async (): Promise<string[]> => {
+  const keys = await getRedis().keys(`${ROOM_KEY}*`);
+  return keys.map((k) => k.replace(ROOM_KEY, ''));
+};
+
+export const cleanupEmptyRooms = async (): Promise<number> => {
+  const roomIds = await getAllRoomIds();
+  let cleanedCount = 0;
+  for (const id of roomIds) {
+    const pCount = await getPlayerCount(id);
+    if (pCount === 0) {
+      await deleteRoom(id);
+      cleanedCount++;
+    }
+  }
+  return cleanedCount;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Players
+// ─────────────────────────────────────────────────────────────────────────────
+
+const deserializePlayer = (playerStr: string): Player => {
+  const d = JSON.parse(playerStr) as Record<string, string>;
+  return {
+    id: d.id,
+    username: d.username,
+    avatar: d.avatar || undefined,
+    score: parseInt(d.score, 10),
+    currentQuestionIndex: parseInt(d.currentQuestionIndex, 10),
+    isReady: d.isReady === 'true',
+    joinedAt: parseInt(d.joinedAt, 10),
+    answers: JSON.parse(d.answers) as Player['answers'],
+  };
+};
+
+export const addPlayer = async (roomId: string, player: Player): Promise<void> => {
+  const redis = getRedis();
+  const playersKey = `${PLAYERS_KEY}${roomId}`;
+  const leaderboardKey = `${LEADERBOARD_KEY}${roomId}`;
+
+  const serialized = {
     id: player.id,
     username: player.username,
-    avatar: player.avatar || '',
+    avatar: player.avatar ?? '',
     score: player.score.toString(),
     currentQuestionIndex: player.currentQuestionIndex.toString(),
     isReady: player.isReady.toString(),
@@ -113,367 +130,181 @@ export const addPlayer = async (roomId: string, player: Player): Promise<void> =
     answers: JSON.stringify(player.answers),
   };
 
-  await redis.hset(playersKey, player.id, JSON.stringify(playerData));
+  await redis.hset(playersKey, player.id, JSON.stringify(serialized));
   await redis.expire(playersKey, ROOM_TTL);
-
-  // Initialize player score in sorted set (leaderboard)
-  const leaderboardKey = `${LEADERBOARD_KEY}${roomId}`;
   await redis.zadd(leaderboardKey, player.score, player.id);
   await redis.expire(leaderboardKey, ROOM_TTL);
 };
 
-/**
- * Get a specific player from a room
- */
-export const getPlayer = async (roomId: string, playerId: string): Promise<Player | null> => {
-  const redis = getRedisClient();
-  const playersKey = `${PLAYERS_KEY}${roomId}`;
-
-  const playerStr = await redis.hget(playersKey, playerId);
-
-  if (!playerStr) {
-    return null;
-  }
-
-  const playerData = JSON.parse(playerStr);
-
-  return {
-    id: playerData.id,
-    username: playerData.username,
-    avatar: playerData.avatar || undefined,
-    score: parseInt(playerData.score, 10),
-    currentQuestionIndex: parseInt(playerData.currentQuestionIndex, 10),
-    isReady: playerData.isReady === 'true',
-    joinedAt: parseInt(playerData.joinedAt, 10),
-    answers: JSON.parse(playerData.answers),
-  };
+export const getPlayer = async (
+  roomId: string,
+  playerId: string,
+): Promise<Player | null> => {
+  const raw = await getRedis().hget(`${PLAYERS_KEY}${roomId}`, playerId);
+  if (!raw) return null;
+  return deserializePlayer(raw);
 };
 
-/**
- * Get all players in a room
- */
 export const getAllPlayers = async (roomId: string): Promise<Player[]> => {
-  const redis = getRedisClient();
-  const playersKey = `${PLAYERS_KEY}${roomId}`;
-
-  const allPlayersData = await redis.hgetall(playersKey);
-
-  if (!allPlayersData || Object.keys(allPlayersData).length === 0) {
-    return [];
-  }
-
-  return (Object.values(allPlayersData) as string[]).map((playerStr) => {
-    const playerData = JSON.parse(playerStr);
-    return {
-      id: playerData.id,
-      username: playerData.username,
-      avatar: playerData.avatar || undefined,
-      score: parseInt(playerData.score, 10),
-      currentQuestionIndex: parseInt(playerData.currentQuestionIndex, 10),
-      isReady: playerData.isReady === 'true',
-      joinedAt: parseInt(playerData.joinedAt, 10),
-      answers: JSON.parse(playerData.answers),
-    };
-  });
+  const all = await getRedis().hgetall(`${PLAYERS_KEY}${roomId}`);
+  if (!all || Object.keys(all).length === 0) return [];
+  return (Object.values(all) as string[]).map(deserializePlayer);
 };
 
-/**
- * Update player data
- */
 export const updatePlayer = async (
   roomId: string,
   playerId: string,
   updates: Partial<Player>,
 ): Promise<void> => {
-  const redis = getRedisClient();
+  const redis = getRedis();
   const playersKey = `${PLAYERS_KEY}${roomId}`;
+  const raw = await redis.hget(playersKey, playerId);
+  if (!raw) return;
 
-  const existingPlayerStr = await redis.hget(playersKey, playerId);
-  if (!existingPlayerStr) {
-    throw new Error('Player not found');
-  }
-
-  const existingPlayer = JSON.parse(existingPlayerStr);
-
-  const updatedPlayer = {
-    ...existingPlayer,
-    ...(updates.username && { username: updates.username }),
-    ...(updates.avatar !== undefined && { avatar: updates.avatar }),
+  const existing = JSON.parse(raw) as Record<string, string>;
+  const updated = {
+    ...existing,
+    ...(updates.username !== undefined && { username: updates.username }),
+    ...(updates.avatar !== undefined && { avatar: updates.avatar ?? '' }),
     ...(updates.score !== undefined && { score: updates.score.toString() }),
-    ...(updates.currentQuestionIndex !== undefined && {
-      currentQuestionIndex: updates.currentQuestionIndex.toString(),
-    }),
+    ...(updates.currentQuestionIndex !== undefined && { currentQuestionIndex: updates.currentQuestionIndex.toString() }),
     ...(updates.isReady !== undefined && { isReady: updates.isReady.toString() }),
-    ...(updates.answers && { answers: JSON.stringify(updates.answers) }),
+    ...(updates.answers !== undefined && { answers: JSON.stringify(updates.answers) }),
   };
 
-  await redis.hset(playersKey, playerId, JSON.stringify(updatedPlayer));
+  await redis.hset(playersKey, playerId, JSON.stringify(updated));
 
-  // Update leaderboard if score changed
   if (updates.score !== undefined) {
-    const leaderboardKey = `${LEADERBOARD_KEY}${roomId}`;
-    await redis.zadd(leaderboardKey, updates.score, playerId);
+    await redis.zadd(`${LEADERBOARD_KEY}${roomId}`, updates.score, playerId);
   }
 };
 
-/**
- * Remove a player from a room
- */
-export const removePlayer = async (roomId: string, playerId: string): Promise<void> => {
-  const redis = getRedisClient();
-  const playersKey = `${PLAYERS_KEY}${roomId}`;
-  const leaderboardKey = `${LEADERBOARD_KEY}${roomId}`;
-
-  await redis.hdel(playersKey, playerId);
-  await redis.zrem(leaderboardKey, playerId);
-};
-
-/**
- * Get player count in a room
- */
-export const getPlayerCount = async (roomId: string): Promise<number> => {
-  const redis = getRedisClient();
-  const playersKey = `${PLAYERS_KEY}${roomId}`;
-  return await redis.hlen(playersKey);
-};
-
-/**
- * Add a chat message to a room
- */
-export const addChatMessage = async (roomId: string, message: ChatMessage): Promise<void> => {
-  const redis = getRedisClient();
-  const chatKey = `${CHAT_KEY}${roomId}`;
-
-  const messageData = JSON.stringify(message);
-
-  // Use Redis LIST to store messages in order
-  await redis.rpush(chatKey, messageData);
-  await redis.expire(chatKey, CHAT_TTL);
-
-  // Keep only last 100 messages to prevent memory issues
-  await redis.ltrim(chatKey, -100, -1);
-};
-
-/**
- * Get all chat messages for a room
- */
-export const getChatMessages = async (roomId: string): Promise<ChatMessage[]> => {
-  const redis = getRedisClient();
-  const chatKey = `${CHAT_KEY}${roomId}`;
-
-  const messages = await redis.lrange(chatKey, 0, -1);
-
-  return messages.map((msg: string) => JSON.parse(msg) as ChatMessage);
-};
-
-/**
- * Get recent chat messages (last N messages)
- */
-export const getRecentChatMessages = async (
-  roomId: string,
-  count: number = 50,
-): Promise<ChatMessage[]> => {
-  const redis = getRedisClient();
-  const chatKey = `${CHAT_KEY}${roomId}`;
-
-  const messages = await redis.lrange(chatKey, -count, -1);
-
-  return messages.map((msg: string) => JSON.parse(msg) as ChatMessage);
-};
-
-/**
- * Get leaderboard for a room (sorted by score descending)
- */
-export const getLeaderboard = async (
-  roomId: string,
-): Promise<Array<{ playerId: string; score: number }>> => {
-  const redis = getRedisClient();
-  const leaderboardKey = `${LEADERBOARD_KEY}${roomId}`;
-
-  // Get all players sorted by score (descending)
-  const leaderboard = await redis.zrevrange(leaderboardKey, 0, -1, 'WITHSCORES');
-
-  const result: Array<{ playerId: string; score: number }> = [];
-  for (let i = 0; i < leaderboard.length; i += 2) {
-    result.push({
-      playerId: leaderboard[i],
-      score: parseInt(leaderboard[i + 1], 10),
-    });
-  }
-
-  return result;
-};
-
-/**
- * Update player score
- */
 export const updatePlayerScore = async (
   roomId: string,
   playerId: string,
   score: number,
 ): Promise<void> => {
-  const redis = getRedisClient();
-  const leaderboardKey = `${LEADERBOARD_KEY}${roomId}`;
-
-  await redis.zadd(leaderboardKey, score, playerId);
+  const redis = getRedis();
+  await redis.zadd(`${LEADERBOARD_KEY}${roomId}`, score, playerId);
   await updatePlayer(roomId, playerId, { score });
 };
 
-/**
- * Delete a room and all associated data
- */
-export const deleteRoom = async (roomId: string): Promise<void> => {
-  const redis = getRedisClient();
-
-  const roomKey = `${ROOM_KEY}${roomId}`;
-  const chatKey = `${CHAT_KEY}${roomId}`;
-  const playersKey = `${PLAYERS_KEY}${roomId}`;
-  const leaderboardKey = `${LEADERBOARD_KEY}${roomId}`;
-
-  await redis.del(roomKey, chatKey, playersKey, leaderboardKey);
+export const removePlayer = async (roomId: string, playerId: string): Promise<void> => {
+  const redis = getRedis();
+  await redis.hdel(`${PLAYERS_KEY}${roomId}`, playerId);
+  await redis.zrem(`${LEADERBOARD_KEY}${roomId}`, playerId);
 };
 
-/**
- * Get all active room IDs
- */
-export const getAllRoomIds = async (): Promise<string[]> => {
-  const redis = getRedisClient();
-  const keys = await redis.keys(`${ROOM_KEY}*`);
-
-  return keys.map((key: string) => key.replace(ROOM_KEY, ''));
+export const getPlayerCount = async (roomId: string): Promise<number> => {
+  return await getRedis().hlen(`${PLAYERS_KEY}${roomId}`);
 };
 
-/**
- * Clean up empty rooms (rooms with no players)
- */
-export const cleanupEmptyRooms = async (): Promise<number> => {
-  const roomIds = await getAllRoomIds();
-  let cleanedCount = 0;
-
-  for (const roomId of roomIds) {
-    const playerCount = await getPlayerCount(roomId);
-    if (playerCount === 0) {
-      const room = await getRoom(roomId);
-      if (room && room.createdAt && Date.now() - room.createdAt > 5 * 60 * 1000) {
-        // 5 minutes
-        await deleteRoom(roomId);
-        cleanedCount++;
-      }
-    }
+export const getLeaderboard = async (
+  roomId: string,
+): Promise<Array<{ playerId: string; score: number }>> => {
+  const raw = await getRedis().zrevrange(`${LEADERBOARD_KEY}${roomId}`, 0, -1, 'WITHSCORES');
+  const result: { playerId: string; score: number }[] = [];
+  for (let i = 0; i < raw.length; i += 2) {
+    result.push({ playerId: raw[i], score: parseInt(raw[i + 1], 10) });
   }
-
-  return cleanedCount;
+  return result;
 };
 
-/**
- * Set team assignments for a 2v2 room (by username, not socket ID)
- */
-export const setTeamAssignmentsByUsername = async (
+// ─────────────────────────────────────────────────────────────────────────────
+// Chat
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const addChatMessage = async (
   roomId: string,
-  teamAssignments: { teamA: string[]; teamB: string[] },
+  message: ChatMessage,
 ): Promise<void> => {
-  const redis = getRedisClient();
-  const teamKey = `team_usernames:${roomId}`;
-
-  // Deduplicate team arrays
-  const deduplicatedAssignments = {
-    teamA: [...new Set(teamAssignments.teamA)],
-    teamB: [...new Set(teamAssignments.teamB)],
-  };
-
-  await redis.set(teamKey, JSON.stringify(deduplicatedAssignments));
-  await redis.expire(teamKey, ROOM_TTL);
+  const redis = getRedis();
+  const key = `${CHAT_KEY}${roomId}`;
+  await redis.rpush(key, JSON.stringify(message));
+  await redis.ltrim(key, -100, -1);
+  await redis.expire(key, ROOM_TTL);
 };
 
-/**
- * Get team assignments by username for a 2v2 room
- */
-export const getTeamAssignmentsByUsername = async (
+export const getChatMessages = async (roomId: string): Promise<ChatMessage[]> => {
+  const msgs = await getRedis().lrange(`${CHAT_KEY}${roomId}`, 0, -1);
+  return msgs.map((m) => JSON.parse(m) as ChatMessage);
+};
+
+export const getRecentChatMessages = async (
   roomId: string,
-): Promise<{ teamA: string[]; teamB: string[] } | null> => {
-  const redis = getRedisClient();
-  const teamKey = `team_usernames:${roomId}`;
-  const data = await redis.get(teamKey);
-  return data ? JSON.parse(data) : null;
+  count = 50,
+): Promise<ChatMessage[]> => {
+  const msgs = await getRedis().lrange(`${CHAT_KEY}${roomId}`, -count, -1);
+  return msgs.map((m) => JSON.parse(m) as ChatMessage);
 };
 
-/**
- * Set team assignments for a 2v2 room (by socket ID)
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Teams
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const setTeamAssignments = async (
   roomId: string,
   teamAssignments: { teamA: string[]; teamB: string[] },
 ): Promise<void> => {
-  const redis = getRedisClient();
-  const teamKey = `${TEAM_ASSIGNMENTS_KEY}${roomId}`;
-
-  // Deduplicate team arrays to prevent duplicate player IDs
-  const deduplicatedAssignments = {
-    teamA: [...new Set(teamAssignments.teamA)],
-    teamB: [...new Set(teamAssignments.teamB)],
-  };
-
-  await redis.set(teamKey, JSON.stringify(deduplicatedAssignments));
-  await redis.expire(teamKey, ROOM_TTL);
+  await getRedis().set(
+    `${TEAM_ASSIGNMENTS_KEY}${roomId}`,
+    JSON.stringify(teamAssignments),
+    'EX',
+    ROOM_TTL,
+  );
 };
 
-/**
- * Get team assignments for a 2v2 room
- */
 export const getTeamAssignments = async (
   roomId: string,
 ): Promise<{ teamA: string[]; teamB: string[] } | null> => {
-  const redis = getRedisClient();
-  const teamKey = `${TEAM_ASSIGNMENTS_KEY}${roomId}`;
-
-  const data = await redis.get(teamKey);
-  if (!data) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Error parsing team assignments:', error);
-    return null;
-  }
+  const data = await getRedis().get(`${TEAM_ASSIGNMENTS_KEY}${roomId}`);
+  return data ? JSON.parse(data) : null;
 };
 
-/**
- * Set team score (shared score for the whole team)
- */
+export const setTeamAssignmentsByUsername = async (
+  roomId: string,
+  teamAssignments: { teamA: string[]; teamB: string[] },
+): Promise<void> => {
+  await getRedis().set(
+    `${TEAM_ASSIGNMENTS_KEY}${roomId}:usernames`,
+    JSON.stringify(teamAssignments),
+    'EX',
+    ROOM_TTL,
+  );
+};
+
+export const getTeamAssignmentsByUsername = async (
+  roomId: string,
+): Promise<{ teamA: string[]; teamB: string[] } | null> => {
+  const data = await getRedis().get(`${TEAM_ASSIGNMENTS_KEY}${roomId}:usernames`);
+  return data ? JSON.parse(data) : null;
+};
+
 export const setTeamScore = async (
   roomId: string,
   teamId: 'teamA' | 'teamB',
   score: number,
 ): Promise<void> => {
-  const redis = getRedisClient();
-  const teamScoreKey = `team-score:${roomId}:${teamId}`;
-  await redis.set(teamScoreKey, score.toString());
-  await redis.expire(teamScoreKey, ROOM_TTL);
+  const key = teamId === 'teamA' ? TEAM_A_SCORE_KEY : TEAM_B_SCORE_KEY;
+  await getRedis().set(`${key}${roomId}`, score.toString(), 'EX', ROOM_TTL);
 };
 
-/**
- * Get team score (shared score for the whole team)
- */
-export const getTeamScore = async (roomId: string, teamId: 'teamA' | 'teamB'): Promise<number> => {
-  const redis = getRedisClient();
-  const teamScoreKey = `team-score:${roomId}:${teamId}`;
-  const score = await redis.get(teamScoreKey);
-  return score ? parseInt(score, 10) : 0;
+export const getTeamScore = async (
+  roomId: string,
+  teamId: 'teamA' | 'teamB',
+): Promise<number> => {
+  const key = teamId === 'teamA' ? TEAM_A_SCORE_KEY : TEAM_B_SCORE_KEY;
+  const val = await getRedis().get(`${key}${roomId}`);
+  return val ? parseInt(val, 10) : 0;
 };
 
-/**
- * Increment team score (add points to shared team score)
- */
 export const incrementTeamScore = async (
   roomId: string,
   teamId: 'teamA' | 'teamB',
   points: number,
 ): Promise<number> => {
-  const redis = getRedisClient();
-  const teamScoreKey = `team-score:${roomId}:${teamId}`;
-  const newScore = await redis.incrby(teamScoreKey, points);
-  await redis.expire(teamScoreKey, ROOM_TTL);
+  const key = teamId === 'teamA' ? TEAM_A_SCORE_KEY : TEAM_B_SCORE_KEY;
+  const newScore = await getRedis().incrby(`${key}${roomId}`, points);
+  await getRedis().expire(`${key}${roomId}`, ROOM_TTL);
   return newScore;
 };

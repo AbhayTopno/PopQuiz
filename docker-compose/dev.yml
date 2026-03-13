@@ -10,14 +10,15 @@ services:
     env_file:
       - .env.backend
     volumes:
-      - ../backend:/usr/src/app:cached # Mount backend source code
-      - /usr/src/app/node_modules # Prevent overwriting node_modules
-      - /usr/src/app/dist # (optional) keep build artifacts inside container
+      - ../backend:/usr/src/app:cached
+      - /usr/src/app/node_modules
+      - /usr/src/app/dist
     command: pnpm run dev
     networks:
       - myapp-network
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -29,12 +30,12 @@ services:
     env_file:
       - .env.frontend
     volumes:
-      - ../frontend:/usr/src/app:cached # Mount frontend code for live reload
-      - /usr/src/app/node_modules # Prevent overwriting node_modules
-      - /usr/src/app/.next # (optional) preserve Next.js cache
+      - ../frontend:/usr/src/app:cached
+      - /usr/src/app/node_modules
+      - /usr/src/app/.next
     depends_on:
       - backend
-    command: pnpm run dev # Use Next.js dev mode
+    command: pnpm run dev
     networks:
       - myapp-network
 

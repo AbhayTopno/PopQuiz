@@ -1,97 +1,55 @@
 import { asyncHandler } from '../middlewares/asyncHandler.js';
-import { Quiz } from '../models/quiz.js';
-import { generateQuiz as generateQuizFromAI } from '../services/aiService.js';
+import { QuizService } from '../services/quiz.service.js';
 import type { Request, Response } from 'express';
-import type { AIQuestion } from '../types/index.js';
 
 const generateAndSaveQuiz = asyncHandler(async (req: Request, res: Response) => {
-  const { topic, difficulty, count } = req.body;
-
-  if (!topic || !difficulty || !count) {
+  try {
+    const { topic, difficulty, count } = req.body;
+    const savedQuiz = await QuizService.generateAndSaveQuiz(topic, difficulty, count);
+    res.status(201).json({ quizId: savedQuiz._id, savedQuiz });
+  } catch (error: any) {
     res.status(400);
-    throw new Error('Please provide topic, difficulty, and count');
+    throw new Error(error.message);
   }
-
-  // 1. Generate quiz content from the AI service
-  const generatedData = await generateQuizFromAI(topic, difficulty, count);
-
-  // 2. Map the AI response fields to match your schema
-  const mappedQuestions = generatedData.questions.map((q: AIQuestion) => ({
-    questionText: q.question,
-    options: q.options,
-    correctAnswer: q.answer,
-  }));
-
-  // 3. Create and save the new quiz
-  const newQuiz = new Quiz({
-    topic,
-    difficulty,
-    numberOfQuestions: count,
-    questions: mappedQuestions,
-    hostedBy: 'AI Generated',
-  });
-
-  const savedQuiz = await newQuiz.save();
-  res.status(201).json({ quizId: savedQuiz._id, savedQuiz });
 });
 
-// Rest of the code remains unchanged
 const createQuiz = asyncHandler(async (req: Request, res: Response) => {
-  const { hostedBy, topic, difficulty, numberOfQuestions, questions } = req.body;
-
-  if (!topic || !difficulty || !numberOfQuestions || !questions) {
+  try {
+    const savedQuiz = await QuizService.createQuiz(req.body);
+    res.status(201).json(savedQuiz);
+  } catch (error: any) {
     res.status(400);
-    throw new Error('Please provide all required fields for manual creation.');
+    throw new Error(error.message);
   }
-
-  const newQuiz = new Quiz({
-    hostedBy,
-    topic,
-    difficulty,
-    numberOfQuestions,
-    questions,
-  });
-  const savedQuiz = await newQuiz.save();
-
-  res.status(201).json(savedQuiz);
 });
 
 const getQuizById = asyncHandler(async (req: Request, res: Response) => {
-  const quiz = await Quiz.findById(req.params.id);
-
-  if (quiz) {
+  try {
+    const quiz = await QuizService.getQuizById(req.params.id);
     res.status(200).json(quiz);
-  } else {
+  } catch (error: any) {
     res.status(404);
-    throw new Error('Quiz not found.');
+    throw new Error(error.message);
   }
 });
 
 const updateQuiz = asyncHandler(async (req: Request, res: Response) => {
-  const { topic, difficulty, hostedBy } = req.body;
-  const updateData = { topic, difficulty, hostedBy };
-
-  const updatedQuiz = await Quiz.findByIdAndUpdate(req.params.id, updateData, {
-    new: true,
-    runValidators: true,
-  });
-
-  if (updatedQuiz) {
+  try {
+    const updatedQuiz = await QuizService.updateQuiz(req.params.id, req.body);
     res.status(200).json(updatedQuiz);
-  } else {
+  } catch (error: any) {
     res.status(404);
-    throw new Error('Quiz not found.');
+    throw new Error(error.message);
   }
 });
 
 const deleteQuiz = asyncHandler(async (req: Request, res: Response) => {
-  const deletedQuiz = await Quiz.findByIdAndDelete(req.params.id);
-
-  if (deletedQuiz) {
+  try {
+    await QuizService.deleteQuiz(req.params.id);
     res.status(200).json({ message: 'Quiz deleted successfully.' });
-  } else {
+  } catch (error: any) {
     res.status(404);
-    throw new Error('Quiz not found.');
+    throw new Error(error.message);
   }
 });
 
