@@ -8,7 +8,7 @@ export interface UpdateProfileData {
 }
 
 export class UserService {
-  static async updateProfile(userId: string, data: UpdateProfileData): Promise<any> {
+  static async updateProfile(userId: string, data: UpdateProfileData) {
     const { username, currentPassword, newPassword } = data;
 
     if (!username || typeof username !== 'string') {

@@ -32,10 +32,16 @@ export class SocketManager {
   private buildCorsValidator() {
     const raw = process.env.CORS_ORIGIN;
     if (!raw) {
-      return (origin: string | undefined, callback: (_error: Error | null, _allow?: boolean) => void) => callback(null, true);
+      return (
+        origin: string | undefined,
+        callback: (_error: Error | null, _allow?: boolean) => void,
+      ) => callback(null, true);
     }
 
-    const origins = raw.split(',').map((o) => o.trim()).filter(Boolean);
+    const origins = raw
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean);
     const hasWildcard = origins.includes('*');
 
     const escapeRegexSpecials = (value: string) => value.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&');
@@ -50,7 +56,10 @@ export class SocketManager {
         return allowed.toLowerCase() === value.toLowerCase();
       });
 
-    return (origin: string | undefined, callback: (_error: Error | null, _allow?: boolean) => void) => {
+    return (
+      origin: string | undefined,
+      callback: (_error: Error | null, _allow?: boolean) => void,
+    ) => {
       if (!origin) return callback(null, true);
       if (hasWildcard || matchesOrigin(origin)) return callback(null, true);
       return callback(new Error(`Origin ${origin} not allowed by Socket.IO CORS policy`));
@@ -100,12 +109,15 @@ export class SocketManager {
               this.io.to(roomId).emit('chat-message', systemMessage);
 
               if (remainingPlayers === 0) {
-                setTimeout(async () => {
-                  const count = await redisService.getPlayerCount(roomId);
-                  if (count === 0) {
-                    await redisService.deleteRoom(roomId);
-                  }
-                }, 5 * 60 * 1000);
+                setTimeout(
+                  async () => {
+                    const count = await redisService.getPlayerCount(roomId);
+                    if (count === 0) {
+                      await redisService.deleteRoom(roomId);
+                    }
+                  },
+                  5 * 60 * 1000,
+                );
               }
             }
           }
@@ -117,13 +129,16 @@ export class SocketManager {
   }
 
   private startCleanupInterval() {
-    setInterval(async () => {
-      try {
-        await redisService.cleanupEmptyRooms();
-      } catch (error) {
-        console.error('Error in cleanup:', error);
-      }
-    }, 60 * 60 * 1000);
+    setInterval(
+      async () => {
+        try {
+          await redisService.cleanupEmptyRooms();
+        } catch (error) {
+          console.error('Error in cleanup:', error);
+        }
+      },
+      60 * 60 * 1000,
+    );
   }
 
   public getServer() {

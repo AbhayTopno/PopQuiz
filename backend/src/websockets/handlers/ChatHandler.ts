@@ -1,4 +1,4 @@
-import type { Server, Socket } from 'socket.io';
+import type { Server } from 'socket.io';
 import type { AuthSocket } from '../../middlewares/socketAuthMiddleware.js';
 import * as redisService from '../../services/redisService.js';
 import type { ChatMessage } from '../../types/index.js';

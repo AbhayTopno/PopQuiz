@@ -24,9 +24,9 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
       email: newUser.email,
       isAdmin: newUser.isAdmin,
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(400);
-    throw new Error(error.message);
+    throw new Error(error instanceof Error ? error.message : 'Unknown error');
   }
 });
 
@@ -40,9 +40,9 @@ const login = asyncHandler(async (req: Request, res: Response) => {
       email: user.email,
       isAdmin: user.isAdmin,
     });
-  } catch (error: any) {
+  } catch (error) {
     res.status(400);
-    throw new Error(error.message);
+    throw new Error(error instanceof Error ? error.message : 'Unknown error');
   }
 });
 
@@ -79,11 +79,12 @@ const updateProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
       isAdmin: updatedUser.isAdmin,
       profilePic: updatedUser.profilePic,
     });
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     // Determine status code based on error message patterns
-    if (error.message === 'User not found') res.status(404);
+    if (message === 'User not found') res.status(404);
     else res.status(400);
-    throw new Error(error.message);
+    throw new Error(message);
   }
 });
 
@@ -91,9 +92,9 @@ const getUserById = asyncHandler(async (req: Request, res: Response) => {
   try {
     const user = await UserService.getUserById(req.params.id);
     res.json(user);
-  } catch (error: any) {
+  } catch (error) {
     res.status(404);
-    throw new Error(error.message);
+    throw new Error(error instanceof Error ? error.message : 'Unknown error');
   }
 });
 

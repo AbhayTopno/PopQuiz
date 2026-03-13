@@ -30,7 +30,13 @@ export class QuizService {
     return await newQuiz.save();
   }
 
-  static async createQuiz(data: any) {
+  static async createQuiz(data: {
+    hostedBy?: string;
+    topic?: string;
+    difficulty?: string;
+    numberOfQuestions?: number;
+    questions?: unknown[];
+  }) {
     const { hostedBy, topic, difficulty, numberOfQuestions, questions } = data;
 
     if (!topic || !difficulty || !numberOfQuestions || !questions) {
@@ -44,7 +50,7 @@ export class QuizService {
       numberOfQuestions,
       questions,
     });
-    
+
     return await newQuiz.save();
   }
 
@@ -56,7 +62,10 @@ export class QuizService {
     return quiz;
   }
 
-  static async updateQuiz(id: string, data: any) {
+  static async updateQuiz(
+    id: string,
+    data: { topic?: string; difficulty?: string; hostedBy?: string },
+  ) {
     const { topic, difficulty, hostedBy } = data;
     const updateData = { topic, difficulty, hostedBy };
 

@@ -136,10 +136,7 @@ export const addPlayer = async (roomId: string, player: Player): Promise<void> =
   await redis.expire(leaderboardKey, ROOM_TTL);
 };
 
-export const getPlayer = async (
-  roomId: string,
-  playerId: string,
-): Promise<Player | null> => {
+export const getPlayer = async (roomId: string, playerId: string): Promise<Player | null> => {
   const raw = await getRedis().hget(`${PLAYERS_KEY}${roomId}`, playerId);
   if (!raw) return null;
   return deserializePlayer(raw);
@@ -167,7 +164,9 @@ export const updatePlayer = async (
     ...(updates.username !== undefined && { username: updates.username }),
     ...(updates.avatar !== undefined && { avatar: updates.avatar ?? '' }),
     ...(updates.score !== undefined && { score: updates.score.toString() }),
-    ...(updates.currentQuestionIndex !== undefined && { currentQuestionIndex: updates.currentQuestionIndex.toString() }),
+    ...(updates.currentQuestionIndex !== undefined && {
+      currentQuestionIndex: updates.currentQuestionIndex.toString(),
+    }),
     ...(updates.isReady !== undefined && { isReady: updates.isReady.toString() }),
     ...(updates.answers !== undefined && { answers: JSON.stringify(updates.answers) }),
   };
@@ -214,10 +213,7 @@ export const getLeaderboard = async (
 // Chat
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const addChatMessage = async (
-  roomId: string,
-  message: ChatMessage,
-): Promise<void> => {
+export const addChatMessage = async (roomId: string, message: ChatMessage): Promise<void> => {
   const redis = getRedis();
   const key = `${CHAT_KEY}${roomId}`;
   await redis.rpush(key, JSON.stringify(message));
@@ -230,10 +226,7 @@ export const getChatMessages = async (roomId: string): Promise<ChatMessage[]> =>
   return msgs.map((m) => JSON.parse(m) as ChatMessage);
 };
 
-export const getRecentChatMessages = async (
-  roomId: string,
-  count = 50,
-): Promise<ChatMessage[]> => {
+export const getRecentChatMessages = async (roomId: string, count = 50): Promise<ChatMessage[]> => {
   const msgs = await getRedis().lrange(`${CHAT_KEY}${roomId}`, -count, -1);
   return msgs.map((m) => JSON.parse(m) as ChatMessage);
 };
@@ -289,10 +282,7 @@ export const setTeamScore = async (
   await getRedis().set(`${key}${roomId}`, score.toString(), 'EX', ROOM_TTL);
 };
 
-export const getTeamScore = async (
-  roomId: string,
-  teamId: 'teamA' | 'teamB',
-): Promise<number> => {
+export const getTeamScore = async (roomId: string, teamId: 'teamA' | 'teamB'): Promise<number> => {
   const key = teamId === 'teamA' ? TEAM_A_SCORE_KEY : TEAM_B_SCORE_KEY;
   const val = await getRedis().get(`${key}${roomId}`);
   return val ? parseInt(val, 10) : 0;

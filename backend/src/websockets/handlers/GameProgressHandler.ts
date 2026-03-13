@@ -146,68 +146,79 @@ export class GameProgressHandler {
     });
 
     // 1v1 Arena
-    socket.on('score-update', async (data: { roomId: string; score: number; currentQuestion: number; finished: boolean }) => {
-      try {
-        const { roomId, score, currentQuestion, finished } = data;
-        let player = await redisService.getPlayer(roomId, socket.id);
+    socket.on(
+      'score-update',
+      async (data: {
+        roomId: string;
+        score: number;
+        currentQuestion: number;
+        finished: boolean;
+      }) => {
+        try {
+          const { roomId, score, currentQuestion, finished } = data;
+          let player = await redisService.getPlayer(roomId, socket.id);
 
-        if (!player) {
-          player = {
-            id: socket.id,
-            username: 'Player',
-            score: 0,
-            currentQuestionIndex: 0,
-            answers: [],
-            isReady: false,
-            joinedAt: Date.now(),
-          };
-          await redisService.addPlayer(roomId, player);
-        }
+          if (!player) {
+            player = {
+              id: socket.id,
+              username: 'Player',
+              score: 0,
+              currentQuestionIndex: 0,
+              answers: [],
+              isReady: false,
+              joinedAt: Date.now(),
+            };
+            await redisService.addPlayer(roomId, player);
+          }
 
-        await redisService.updatePlayer(roomId, socket.id, {
-          score,
-          currentQuestionIndex: currentQuestion,
-        });
-
-        io.to(roomId).emit('score-update-broadcast', {
-          id: socket.id,
-          username: player.username,
-          score,
-          currentQuestion,
-          finished,
-        });
-      } catch (error) {
-        console.error('Error in score-update:', error);
-      }
-    });
-
-    socket.on('player-finished', async (data: { roomId: string; username: string; score: number }) => {
-      try {
-        const { roomId, username, score } = data;
-
-        await redisService.updatePlayer(roomId, socket.id, {
-          score,
-          isReady: true,
-        });
-
-        socket.to(roomId).emit('opponent-finished', { username, score });
-
-        const players = await redisService.getAllPlayers(roomId);
-        const allFinished = players.every((p) => p.isReady);
-
-        if (allFinished && players.length >= 2) {
-          io.to(roomId).emit('battle-complete', {
-            players: players.map((p) => ({
-              id: p.id,
-              username: p.username,
-              score: p.score,
-            })),
+          await redisService.updatePlayer(roomId, socket.id, {
+            score,
+            currentQuestionIndex: currentQuestion,
           });
+
+          io.to(roomId).emit('score-update-broadcast', {
+            id: socket.id,
+            username: player.username,
+            score,
+            currentQuestion,
+            finished,
+          });
+        } catch (error) {
+          console.error('Error in score-update:', error);
         }
-      } catch (error) {
-        console.error('Error in player-finished:', error);
-      }
-    });
+      },
+    );
+
+    socket.on(
+      'player-finished',
+      async (data: { roomId: string; username: string; score: number }) => {
+        try {
+          const { roomId, username, score } = data;
+
+          await redisService.updatePlayer(roomId, socket.id, {
+            score,
+            isReady: true,
+          });
+
+          socket.to(roomId).emit('opponent-finished', { username, score });
+
+          const players = await redisService.getAllPlayers(roomId);
+          const allFinished = players.every((p) => p.isReady);
+
+          if (allFinished && players.length >= 2) {
+            io.to(roomId).emit('battle-complete', {
+              players: players.map((p) => ({
+                id: p.id,
+                username: p.username,
+                score: p.score,
+              })),
+            });
+          }
+        } catch (error) {
+          console.error('Error in player-finished:', error);
+        }
+      },
+    );
 
     socket.on('get-leaderboard', async (data: { roomId: string }) => {
       try {
@@ -218,11 +229,11 @@ export class GameProgressHandler {
           const players = await redisService.getAllPlayers(roomId);
           const leaderboard = players
             .map((p) => ({
-               playerId: p.id,
-               username: p.username,
-               avatar: p.avatar,
-               score: p.score,
-               currentQuestionIndex: p.currentQuestionIndex,
+              playerId: p.id,
+              username: p.username,
+              avatar: p.avatar,
+              score: p.score,
+              currentQuestionIndex: p.currentQuestionIndex,
             }))
             .sort((a, b) => {
               if (b.score !== a.score) return b.score - a.score;

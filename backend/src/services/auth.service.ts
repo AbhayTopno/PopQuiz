@@ -2,7 +2,7 @@ import { User } from '../models/user.js';
 import bcrypt from 'bcryptjs';
 
 export class AuthService {
-  static async signup(data: any): Promise<any> {
+  static async signup(data: { username?: string; email?: string; password?: string }) {
     const { username, email, password } = data;
 
     if (!username || !email || !password) {
@@ -33,7 +33,7 @@ export class AuthService {
     return newUser;
   }
 
-  static async login(data: any): Promise<any> {
+  static async login(data: { email?: string; password?: string }) {
     const { email, password } = data;
 
     if (!email || !password) {
