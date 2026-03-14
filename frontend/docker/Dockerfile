@@ -4,7 +4,7 @@
 # Builder Stage
 # --------------------
 FROM node:22-alpine AS builder
-RUN apk add --no-cache git && npm install -g pnpm@latest
+RUN apk add --no-cache git && npm install -g npm@11.11.1 pnpm@10.32.1
 WORKDIR /usr/src/app
 
 # Install deps
@@ -20,7 +20,7 @@ RUN pnpm run build
 # --------------------
 FROM node:22-alpine AS production
 WORKDIR /usr/src/app
-RUN apk add --no-cache ca-certificates bash
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates bash && npm install -g npm@11.11.1
 ENV NODE_ENV=production
 
 # Copy built app

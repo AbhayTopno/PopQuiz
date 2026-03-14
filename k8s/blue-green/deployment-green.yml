@@ -91,7 +91,7 @@ spec:
     spec:
       containers:
         - name: popquiz-frontend
-          image: abhaytopno/popquiz-frontend:v8
+          image: abhaytopno/popquiz-frontend:v10
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
