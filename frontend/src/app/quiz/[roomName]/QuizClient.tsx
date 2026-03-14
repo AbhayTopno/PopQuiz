@@ -1,26 +1,43 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { QuizData, Props } from '@/types';
-
-const FEEDBACK_DELAY_MS = 3000; // Delay for showing feedback before next question
+import React, { useState } from 'react';
+import { Props } from '@/types';
+import { useQuizState } from '@/hooks/quiz/useQuizState';
+import { useQuizTimer } from '@/hooks/quiz/useQuizTimer';
 
 export default function QuizClient({ initialQuizData, initialDuration }: Props) {
-  // --- State (use server-provided initial data)
-  const [quizData] = useState<QuizData | null>(initialQuizData ?? null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [score, setScore] = useState(0);
-  const [isFinished, setIsFinished] = useState(false);
-  const [isLoading] = useState(false); // data already loaded from server
-  const [error] = useState<string | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number>(initialDuration ?? 10);
-  const [duration] = useState<number>(initialDuration ?? 10);
-  const [isFadingOut, setIsFadingOut] = useState(false); // For question transition
-  const [pendingTimeoutReveal, setPendingTimeoutReveal] = useState(false);
+  const {
+    quizData,
+    currentQuestionIndex,
+    setCurrentQuestionIndex,
+    selectedAnswer,
+    setSelectedAnswer,
+    score,
+    setScore,
+    isFinished,
+    setIsFinished,
+    showFeedback,
+    setShowFeedback,
+    isFadingOut,
+    setIsFadingOut,
+    handleNextBase,
+  } = useQuizState(initialQuizData ?? null);
 
-  // --- Background style (restored from original)
+  const [isLoading] = useState(false);
+  const [error] = useState<string | null>(null);
+
+  const { timeLeft, duration, setTimeLeft, handleProgressTransitionEnd } = useQuizTimer({
+    initialDuration: initialDuration ?? 10,
+    isPaused: isLoading || isFinished || showFeedback,
+    onTimeoutReveal: () => handleNext(null),
+  });
+
+  const handleNext = (selectedOption: string | null) => {
+    handleNextBase(selectedOption, timeLeft, duration, () => {
+      setTimeLeft(duration);
+    });
+  };
+
   const backgroundStyle = {
     backgroundImage: `url(${'/img/Quiz.png'})`,
     backgroundSize: 'cover',
@@ -28,80 +45,8 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
     backgroundRepeat: 'no-repeat',
   };
 
-  // Keep timeLeft sync when duration changes
-  useEffect(() => {
-    setTimeLeft(duration);
-  }, [duration]);
-
-  // Memoize handleNext to stabilize for useEffect dependency
-  const handleNext = useCallback(
-    (selectedOption: string | null) => {
-      if (!quizData) return;
-
-      setShowFeedback(true);
-      setSelectedAnswer(selectedOption);
-
-      if (
-        selectedOption &&
-        selectedOption === quizData.questions[currentQuestionIndex].correctAnswer
-      ) {
-        setScore((prev) => prev + 1);
-      }
-
-      setTimeout(() => {
-        setIsFadingOut(true);
-        setTimeout(() => {
-          const nextIndex = currentQuestionIndex + 1;
-          if (nextIndex < quizData.questions.length) {
-            setCurrentQuestionIndex(nextIndex);
-            setSelectedAnswer(null);
-            setShowFeedback(false);
-            setTimeLeft(duration);
-            setIsFadingOut(false);
-          } else {
-            setIsFinished(true);
-          }
-        }, 300);
-      }, FEEDBACK_DELAY_MS);
-    },
-    [quizData, currentQuestionIndex, duration],
-  );
-
-  // Timer countdown effect
-  useEffect(() => {
-    if (isLoading || isFinished || showFeedback) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (isLoading || isFinished || showFeedback) return prev;
-        const next = prev - 1;
-        if (next <= 0) {
-          // Show 0s and wait until the progress bar width reaches zero, then reveal
-          setPendingTimeoutReveal(true);
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isLoading, isFinished, showFeedback, currentQuestionIndex, duration, handleNext]);
-
-  // When the progress bar finishes shrinking to zero width, reveal the answer for timeout
-  const handleProgressTransitionEnd = useCallback(
-    (e: React.TransitionEvent<HTMLDivElement>) => {
-      if (e.propertyName !== 'width') return;
-      if (!pendingTimeoutReveal) return;
-      if (timeLeft > 0) return;
-      setPendingTimeoutReveal(false);
-      handleNext(null);
-    },
-    [pendingTimeoutReveal, timeLeft, handleNext],
-  );
-
-  // --- UI helpers (restored classes & styles) ---
   const getButtonClass = (option: string) => {
-    if (!quizData) return ''; // Guard against null quizData
+    if (!quizData) return '';
 
     const baseClass =
       'w-full rounded-lg px-4 py-3 font-general text-left text-white border-2 transition-all duration-300 transform active:scale-95 disabled:cursor-not-allowed';
@@ -123,19 +68,14 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
 
   const cleanOption = (option: string) => option.replace(/^[A-D]:\s*/i, '');
 
-  // --- Render flows with original styling ---
-
-  // Loading UI (restored background & loader)
   if (isLoading) {
     return (
       <div className="flex-center h-screen" style={backgroundStyle}>
-        {/* Thematic Loader */}
         <div className="loader"></div>
       </div>
     );
   }
 
-  // Error UI (restored)
   if (error || !quizData) {
     return (
       <div className="flex-center flex-col h-screen p-4 text-center" style={backgroundStyle}>
@@ -157,7 +97,6 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
     );
   }
 
-  // Finished UI (restored visuals)
   if (isFinished) {
     const percentage = Math.round((score / quizData.questions.length) * 100);
 
@@ -233,7 +172,6 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
     );
   }
 
-  // Active quiz UI (restored layout, transitions, timer bar, options)
   const currentQuestion = quizData.questions[currentQuestionIndex];
   const timePercentage = (timeLeft / duration) * 100;
   const isTimeLow = timeLeft <= 5;
@@ -245,7 +183,6 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
           isFadingOut ? 'opacity-0' : 'opacity-100'
         }`}
       >
-        {/* --- Header --- */}
         <div className="mb-6 text-white">
           <div className="flex justify-center items-center mb-2">
             <h1 className="font-zentry text-2xl md:text-3xl font-black uppercase text-gray-100 shadow-lg [text-shadow:_0_0_10px_rgb(239_68_68_/_50%)]">
@@ -260,9 +197,7 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
           </div>
         </div>
 
-        {/* --- Main Quiz Card --- */}
         <div className="bg-black/50 rounded-2xl border border-cyan-400/30 p-6 md:p-8 shadow-2xl backdrop-blur-md">
-          {/* Timer Bar with right-side timer pill */}
           <div className="mb-6 flex items-center gap-3">
             <div
               className="flex-1 relative h-2.5 bg-gray-700/50 rounded-full overflow-hidden"

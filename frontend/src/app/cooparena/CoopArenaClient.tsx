@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { QuizData } from '@/types';
-import { getSocket } from '@/utils/socket';
 import { calculateScore, type Difficulty } from '@/utils/scoring';
+import { useCoopSocket } from '@/hooks/arena/useCoopSocket';
+import { useQuizTimer } from '@/hooks/quiz/useQuizTimer';
 
 type CoopArenaClientProps = {
   roomId: string;
@@ -11,12 +12,6 @@ type CoopArenaClientProps = {
   initialQuizData: QuizData;
   initialDuration?: number;
   quizId?: string;
-};
-
-type TeamMember = {
-  id: string;
-  username: string;
-  avatar?: string;
 };
 
 const FEEDBACK_DELAY_MS = 3000;
@@ -28,66 +23,26 @@ export default function CoopArenaClient({
   initialDuration = 10,
   quizId,
 }: CoopArenaClientProps) {
-  const socket = useMemo(() => getSocket(), []);
   const [quizData] = useState<QuizData | null>(initialQuizData ?? null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
 
-  // Team states
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [teamScore, setTeamScore] = useState(0);
-
   const [isFinished, setIsFinished] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number>(initialDuration);
-  const [duration] = useState<number>(initialDuration);
   const [isFadingOut, setIsFadingOut] = useState(false);
-  const [connected, setConnected] = useState(false);
+
   const [canAnswer, setCanAnswer] = useState(true);
   const [someoneAnswered, setSomeoneAnswered] = useState(false);
   const [answeringPlayer, setAnsweringPlayer] = useState<string | null>(null);
-  const joinedRef = useRef(false);
-  const [pendingTimeoutReveal, setPendingTimeoutReveal] = useState(false);
 
-  const backgroundStyle = {
-    backgroundImage: `url(${'/img/Quiz.png'})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-  } as const;
+  const durationRef = useRef(initialDuration);
+  const setTimeLeftRef = useRef<React.Dispatch<React.SetStateAction<number>> | null>(null);
+  const socketRef = useRef<{ id?: string; emit: (event: string, payload: unknown) => void } | null>(
+    null,
+  );
 
-  useEffect(() => {
-    setTimeLeft(duration);
-  }, [duration]);
-
-  // Connect/join and wire events
-  useEffect(() => {
-    const onConnect = () => {
-      setConnected(true);
-      if (!joinedRef.current && roomId) {
-        joinedRef.current = true;
-        socket.emit('join-coop-room', {
-          roomId,
-          quizId: quizId || initialQuizData._id,
-          username,
-        });
-      }
-    };
-    const onDisconnect = () => setConnected(false);
-
-    // Team members update
-    const onTeamUpdate = (data: { members: TeamMember[]; score: number }) => {
-      setTeamMembers(data.members);
-      setTeamScore(data.score);
-    };
-
-    // Someone answered - lock everyone else and show feedback
-    const onAnswerLocked = (data: {
-      answeredBy: string;
-      playerName: string;
-      answer: string;
-      isCorrect: boolean;
-    }) => {
+  const onAnswerLockedCallback = useCallback(
+    (data: { answeredBy: string; playerName: string; answer: string; isCorrect: boolean }) => {
       // Lock all players immediately
       setCanAnswer(false);
       setSomeoneAnswered(true);
@@ -102,89 +57,66 @@ export default function CoopArenaClient({
         setIsFadingOut(true);
         setTimeout(() => {
           const nextIndex = currentQuestionIndex + 1;
-          if (nextIndex < quizData!.questions.length) {
+          if (nextIndex < (quizData?.questions.length || 0)) {
             setCurrentQuestionIndex(nextIndex);
             setSelectedAnswer(null);
             setShowFeedback(false);
-            setTimeLeft(duration);
             setIsFadingOut(false);
             setCanAnswer(true);
             setSomeoneAnswered(false);
             setAnsweringPlayer(null);
+            setTimeLeftRef.current?.(durationRef.current);
           } else {
             // Last question finished - only the answering player emits finish
-            if (data.answeredBy === socket.id) {
-              socket.emit('coop-quiz-finished', { roomId });
+            if (data.answeredBy === socketRef.current?.id) {
+              socketRef.current?.emit('coop-quiz-finished', { roomId });
             }
           }
         }, 300);
       }, FEEDBACK_DELAY_MS);
-    };
+    },
+    [currentQuestionIndex, quizData?.questions.length, roomId],
+  );
 
-    // Score update after answer
-    const onScoreUpdate = (data: {
-      score: number;
-      currentQuestion: number;
-      answeredBy: string;
-      answer?: string;
-      isCorrect?: boolean;
-    }) => {
-      setTeamScore(data.score);
-    };
-
-    // Quiz complete
-    const onQuizComplete = (data: { finalScore: number; members: TeamMember[] }) => {
-      setTeamScore(data.finalScore);
-      setTeamMembers(data.members);
-      setIsFinished(true);
-    };
-
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('coop-team-update', onTeamUpdate);
-    socket.on('coop-answer-locked', onAnswerLocked);
-    socket.on('coop-score-update', onScoreUpdate);
-    socket.on('coop-quiz-complete', onQuizComplete);
-
-    if (socket.connected) onConnect();
-    else socket.connect();
-
-    return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('coop-team-update', onTeamUpdate);
-      socket.off('coop-answer-locked', onAnswerLocked);
-      socket.off('coop-score-update', onScoreUpdate);
-      socket.off('coop-quiz-complete', onQuizComplete);
-    };
-  }, [
-    socket,
+  const { socket, connected, teamMembers, teamScore } = useCoopSocket({
     roomId,
     username,
-    quizId,
-    initialQuizData?._id,
-    currentQuestionIndex,
-    quizData,
-    duration,
-  ]);
+    quizId: quizId || initialQuizData._id,
+    setIsFinished,
+    onAnswerLockedCallback,
+  });
+
+  const { timeLeft, duration, setTimeLeft, handleProgressTransitionEnd } = useQuizTimer({
+    initialDuration,
+    isPaused: isFinished || showFeedback,
+    onTimeoutReveal: () => {
+      if (canAnswer) handleNext(null);
+    },
+  });
+
+  useEffect(() => {
+    durationRef.current = duration;
+    setTimeLeftRef.current = setTimeLeft;
+  }, [duration, setTimeLeft]);
+
+  useEffect(() => {
+    socketRef.current = socket;
+  }, [socket]);
 
   const handleNext = useCallback(
     (selectedOption: string | null) => {
       if (!quizData || !canAnswer) return;
 
-      // Lock out immediately for the current player
       setCanAnswer(false);
 
       const isCorrect =
         !!selectedOption &&
         selectedOption === quizData.questions[currentQuestionIndex].correctAnswer;
 
-      // Calculate scoring based on difficulty and remaining time
       const difficulty = (quizData.difficulty || 'medium') as Difficulty;
       const gainedPoints = calculateScore(difficulty, timeLeft, duration, !!isCorrect);
 
-      // Emit answer to server - server will broadcast to all players
-      socket.emit('submit-coop-answer', {
+      socket?.emit('submit-coop-answer', {
         roomId,
         answer: selectedOption,
         isCorrect,
@@ -192,48 +124,17 @@ export default function CoopArenaClient({
         currentQuestion: currentQuestionIndex,
         timeLeft,
       });
-
-      // Note: Advancement is handled by the 'coop-answer-locked' socket event
-      // which ensures all players advance together
     },
     [quizData, currentQuestionIndex, duration, roomId, socket, timeLeft, canAnswer],
   );
 
-  // Timer
-  useEffect(() => {
-    if (isFinished || showFeedback) return;
+  const backgroundStyle = {
+    backgroundImage: `url(${'/img/Quiz.png'})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  } as const;
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (isFinished || showFeedback) return prev;
-
-        const next = prev - 1;
-        if (next <= 0) {
-          setPendingTimeoutReveal(true);
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isFinished, showFeedback]);
-
-  // Handle timeout
-  const handleProgressTransitionEnd = useCallback(
-    (e: React.TransitionEvent<HTMLDivElement>) => {
-      if (e.propertyName !== 'width') return;
-      if (!pendingTimeoutReveal) return;
-      if (timeLeft > 0) return;
-      setPendingTimeoutReveal(false);
-      if (canAnswer) {
-        handleNext(null);
-      }
-    },
-    [pendingTimeoutReveal, timeLeft, handleNext, canAnswer],
-  );
-
-  // UI helpers
   const getButtonClass = (option: string) => {
     if (!quizData) return '';
     const baseClass =
@@ -324,13 +225,11 @@ export default function CoopArenaClient({
       {/* Minimal Team Scoreboard - Horizontal Layout */}
       <div className="w-full max-w-3xl mx-auto mb-4">
         <div className="rounded-xl px-3 py-2 md:px-4 border border-cyan-400/50 bg-black/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
-          {/* Left: Score */}
           <div className="flex items-center gap-3">
             <span className="font-general text-xs sm:text-sm text-white/80">Team Score:</span>
             <span className="text-2xl sm:text-3xl font-zentry text-cyan-400">{teamScore}</span>
           </div>
 
-          {/* Right: Players */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-general text-xs text-white/60">
               {teamMembers.length} Players:
