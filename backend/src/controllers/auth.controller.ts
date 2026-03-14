@@ -1,61 +1,53 @@
 import { asyncHandler } from '../middlewares/asyncHandler.js';
-import { User } from '../models/user.js';
-import bcrypt from 'bcryptjs';
 import generateToken from '../utils/createToken.js';
+import { AuthService } from '../services/auth.service.js';
+import { UserService } from '../services/user.service.js';
 import type { Request, Response } from 'express';
 
 const signup = asyncHandler(async (req: Request, res: Response) => {
   const { username, email, password } = req.body;
 
-  if (!username || !email || !password)
+  if (!username || !email || !password) {
     return res.status(400).json({ message: 'All fields are required' });
+  }
 
-  if (password.length < 8)
-    return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+  try {
+    const newUser = await AuthService.signupUser(username, email, password);
+    generateToken(res, newUser._id.toString());
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return res.status(400).json({ message: 'Invalid email format' });
-
-  const existingUser = await User.findOne({ email });
-  if (existingUser) return res.status(400).json({ message: 'Email already exists' });
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const newUser = await User.create({
-    username,
-    email,
-    password: hashedPassword,
-  });
-
-  generateToken(res, newUser._id.toString());
-
-  res.status(201).json({
-    _id: newUser._id,
-    username: newUser.username,
-    email: newUser.email,
-    isAdmin: newUser.isAdmin,
-  });
+    res.status(201).json({
+      _id: newUser._id,
+      username: newUser.username,
+      email: newUser.email,
+      isAdmin: newUser.isAdmin,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(400).json({ message: errorMessage });
+  }
 });
 
 const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
-  if (!email || !password) return res.status(400).json({ message: 'All fields are required' });
+  if (!email || !password) {
+    return res.status(400).json({ message: 'All fields are required' });
+  }
 
-  const user = await User.findOne({ email });
-  if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+  try {
+    const user = await AuthService.loginUser(email, password);
+    generateToken(res, user._id.toString());
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
-
-  generateToken(res, user._id.toString());
-
-  res.status(200).json({
-    _id: user._id,
-    username: user.username,
-    email: user.email,
-    isAdmin: user.isAdmin,
-  });
+    res.status(200).json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      isAdmin: user.isAdmin,
+    });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(400).json({ message: errorMessage });
+  }
 });
 
 const logout = asyncHandler(async (req: Request, res: Response) => {
@@ -85,84 +77,31 @@ const updateProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
     throw new Error('Username is required');
   }
 
-  const normalizedUsername = username.trim();
+  try {
+    const userRecord = await UserService.updateProfile(
+      req.user._id,
+      username,
+      currentPassword,
+      newPassword,
+    );
 
-  if (!normalizedUsername) {
+    req.user = {
+      _id: userRecord._id.toString(),
+      username: userRecord.username,
+      email: userRecord.email,
+      isAdmin: userRecord.isAdmin,
+      profilePic: userRecord.profilePic,
+    };
+
+    res.json(req.user);
+  } catch (error: unknown) {
     res.status(400);
-    throw new Error('Username cannot be empty');
+    throw new Error(error instanceof Error ? error.message : 'Unknown error');
   }
-
-  if (normalizedUsername.length < 3) {
-    res.status(400);
-    throw new Error('Username must be at least 3 characters long');
-  }
-
-  const userRecord = await User.findById(req.user._id);
-
-  if (!userRecord) {
-    res.status(404);
-    throw new Error('User not found');
-  }
-
-  if (normalizedUsername.toLowerCase() !== userRecord.username.toLowerCase()) {
-    const existingUser = await User.findOne({
-      username: normalizedUsername,
-      _id: { $ne: userRecord._id },
-    });
-
-    if (existingUser) {
-      res.status(400);
-      throw new Error('Username is already taken');
-    }
-  }
-
-  userRecord.username = normalizedUsername;
-
-  const wantsPasswordChange = Boolean(currentPassword || newPassword);
-
-  if (wantsPasswordChange) {
-    if (!currentPassword || !newPassword) {
-      res.status(400);
-      throw new Error('Current and new passwords are required to change password');
-    }
-
-    if (newPassword.length < 8) {
-      res.status(400);
-      throw new Error('New password must be at least 8 characters long');
-    }
-
-    const passwordMatches = await bcrypt.compare(currentPassword, userRecord.password);
-
-    if (!passwordMatches) {
-      res.status(400);
-      throw new Error('Current password is incorrect');
-    }
-
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    userRecord.password = hashedPassword;
-  }
-
-  await userRecord.save();
-
-  req.user = {
-    _id: userRecord._id.toString(),
-    username: userRecord.username,
-    email: userRecord.email,
-    isAdmin: userRecord.isAdmin,
-    profilePic: userRecord.profilePic,
-  };
-
-  res.json({
-    _id: userRecord._id,
-    username: userRecord.username,
-    email: userRecord.email,
-    isAdmin: userRecord.isAdmin,
-    profilePic: userRecord.profilePic,
-  });
 });
 
 const getUserById = asyncHandler(async (req: Request, res: Response) => {
-  const user = await User.findById(req.params.id).select('-password');
+  const user = await UserService.getUserById(req.params.id);
 
   if (user) {
     res.json(user);
@@ -173,7 +112,7 @@ const getUserById = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
-  const users = await User.find().select('-password');
+  const users = await UserService.getAllUsers();
   res.json(users);
 });
 
@@ -188,15 +127,8 @@ interface AuthRequest extends Request {
 }
 
 const getCurrentUser = asyncHandler(async (req: AuthRequest, res: Response) => {
-  // req.user is attached by the protect middleware
   if (req.user) {
-    res.json({
-      _id: req.user._id,
-      username: req.user.username,
-      email: req.user.email,
-      isAdmin: req.user.isAdmin,
-      profilePic: req.user.profilePic,
-    });
+    res.json(req.user);
   } else {
     res.status(401);
     throw new Error('Not authenticated');

@@ -4,7 +4,7 @@
 # Backend Production Build
 # -------------------------
 FROM node:22-alpine AS builder
-RUN apk add --no-cache libc6-compat && npm install -g pnpm@latest
+RUN apk upgrade --no-cache && apk add --no-cache libc6-compat && npm install -g npm@11.11.1 pnpm@10.32.1
 WORKDIR /usr/src/app
 
 COPY package.json pnpm-lock.yaml ./
@@ -19,14 +19,16 @@ RUN pnpm run build
 # -------------------------
 FROM node:22-alpine AS production
 WORKDIR /usr/src/app
-RUN apk add --no-cache ca-certificates
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates && npm install -g npm@11.11.1 pnpm@10.32.1
 
 ENV NODE_ENV=production
 
-# Only copy necessary production files
+# Copy only what's needed for a clean prod install (excludes devDependencies like esbuild/tsx)
 COPY --from=builder /usr/src/app/package.json ./package.json
 COPY --from=builder /usr/src/app/pnpm-lock.yaml ./pnpm-lock.yaml
-COPY --from=builder /usr/src/app/node_modules ./node_modules
+RUN pnpm install --frozen-lockfile --prod && rm -rf /root/.local/share/pnpm /root/.npm /tmp/*
+
+# Copy compiled output
 COPY --from=builder /usr/src/app/dist ./dist
 
 EXPOSE 5000
