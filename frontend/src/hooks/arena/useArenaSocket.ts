@@ -1,0 +1,106 @@
+import { useEffect, useRef, useState } from 'react';
+import { useSocketConnection } from '../useSocketConnection';
+
+type LeaderboardEntry = {
+  playerId: string;
+  username: string;
+  avatar?: string;
+  score: number;
+  currentQuestionIndex: number;
+};
+
+type ArenaSocketProps = {
+  roomId: string;
+  username: string;
+  quizId?: string;
+};
+
+export function useArenaSocket({
+  roomId,
+  username,
+  quizId,
+  setScore,
+  setIsFinished,
+}: ArenaSocketProps & {
+  setScore: (score: number) => void;
+  setIsFinished: (finished: boolean) => void;
+}) {
+  const { socket, connected } = useSocketConnection();
+  const joinedRef = useRef(false);
+
+  const [opponent, setOpponent] = useState<{ id?: string; username: string; score: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (connected && !joinedRef.current && roomId && quizId) {
+      joinedRef.current = true;
+      socket.emit('join-room', { roomId, quizId, username });
+      socket.emit('get-leaderboard', { roomId });
+    }
+  }, [connected, roomId, quizId, username, socket]);
+
+  useEffect(() => {
+    const onScoreBroadcast = (data: {
+      id: string;
+      username: string;
+      score: number;
+      currentQuestion: number;
+      finished: boolean;
+    }) => {
+      if (!socket.id || data.id === socket.id) {
+        setScore(data.score);
+      } else {
+        setOpponent((_prev) => ({ id: data.id, username: data.username, score: data.score }));
+      }
+    };
+
+    const onLeaderboard = (entries: LeaderboardEntry[]) => {
+      if (!socket.id) return;
+      const me = entries.find((e) => e.playerId === socket.id);
+      const other = entries.find((e) => e.playerId !== socket.id);
+      if (me) setScore(me.score);
+      if (other) setOpponent({ id: other.playerId, username: other.username, score: other.score });
+    };
+
+    const onOpponentFinished = ({
+      username: opp,
+      score: s,
+    }: {
+      username: string;
+      score: number;
+    }) => {
+      setOpponent((prev) => ({ ...(prev || { username: opp }), score: s }));
+    };
+
+    const onBattleComplete = ({
+      players,
+    }: {
+      players: { id: string; username: string; score: number }[];
+    }) => {
+      const me = players.find((p) => p.id === socket.id);
+      const other = players.find((p) => p.id !== socket.id);
+      if (me) setScore(me.score);
+      if (other) setOpponent({ id: other.id, username: other.username, score: other.score });
+      setIsFinished(true);
+    };
+
+    socket.on('score-update-broadcast', onScoreBroadcast);
+    socket.on('leaderboard-update', onLeaderboard);
+    socket.on('opponent-finished', onOpponentFinished);
+    socket.on('battle-complete', onBattleComplete);
+
+    return () => {
+      socket.off('score-update-broadcast', onScoreBroadcast);
+      socket.off('leaderboard-update', onLeaderboard);
+      socket.off('opponent-finished', onOpponentFinished);
+      socket.off('battle-complete', onBattleComplete);
+    };
+  }, [socket, setIsFinished, setScore]);
+
+  return {
+    socket,
+    connected,
+    opponent,
+  };
+}
