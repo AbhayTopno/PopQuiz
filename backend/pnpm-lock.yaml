@@ -41,9 +41,6 @@ importers:
       mongoose:
         specifier: ^8.19.3
         version: 8.19.3
-      pnpm:
-        specifier: ^10.20.0
-        version: 10.20.0
       socket.io:
         specifier: ^4.8.1
         version: 4.8.1
@@ -1314,11 +1311,6 @@ packages:
   picomatch@2.3.1:
     resolution: {integrity: sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA==}
     engines: {node: '>=8.6'}
-
-  pnpm@10.20.0:
-    resolution: {integrity: sha512-z5mYIiFi3YWGTQqBAueJLnukzq3rv1ox+cL85I384xepxTufZGTR75BCy6LgKuAqn3wUOitDjNk8kYQPAZK53Q==}
-    engines: {node: '>=18.12'}
-    hasBin: true
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -2851,8 +2843,6 @@ snapshots:
   path-to-regexp@8.3.0: {}
 
   picomatch@2.3.1: {}
-
-  pnpm@10.20.0: {}
 
   prelude-ls@1.2.1: {}
 

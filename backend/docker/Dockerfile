@@ -4,7 +4,7 @@
 # Backend Production Build
 # -------------------------
 FROM node:22-alpine AS builder
-RUN apk add --no-cache libc6-compat && npm install -g pnpm@latest
+RUN apk upgrade --no-cache && apk add --no-cache libc6-compat && npm install -g pnpm@latest
 WORKDIR /usr/src/app
 
 COPY package.json pnpm-lock.yaml ./
@@ -19,7 +19,7 @@ RUN pnpm run build
 # -------------------------
 FROM node:22-alpine AS production
 WORKDIR /usr/src/app
-RUN apk add --no-cache ca-certificates && npm install -g pnpm@latest
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates && npm install -g pnpm@latest
 
 ENV NODE_ENV=production
 
