@@ -99,9 +99,7 @@ jobs:
           curl -L https://github.com/stackrox/kube-linter/releases/latest/download/kube-linter-linux.tar.gz | tar xz
           sudo mv kube-linter /usr/local/bin/
           # kubescape
-          curl -L -o kubescape https://github.com/kubescape/kubescape/releases/latest/download/kubescape-ubuntu-latest
-          chmod +x kubescape
-          sudo mv kubescape /usr/local/bin/
+          curl -s https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | /bin/bash
           # helm
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
       - name: Validate manifests with kubeconform

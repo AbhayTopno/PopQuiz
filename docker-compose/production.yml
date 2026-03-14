@@ -15,7 +15,7 @@ services:
 
   frontend:
     container_name: production_frontend
-    image: abhaytopno/popquiz-frontend:v8
+    image: abhaytopno/popquiz-frontend:v12
     restart: unless-stopped
     env_file:
       - .env.frontend

@@ -49,7 +49,7 @@ spec:
     spec:
       containers:
         - name: popquiz-backend
-          image: abhaytopno/popquiz-backend:v10
+          image: abhaytopno/popquiz-backend:v12
           imagePullPolicy: Always
           ports:
             - containerPort: 5000
