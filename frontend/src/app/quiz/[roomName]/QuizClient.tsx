@@ -12,8 +12,9 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
     setCurrentQuestionIndex,
     selectedAnswer,
     setSelectedAnswer,
-    score,
     setScore,
+    correctAnswersCount,
+    setCorrectAnswersCount,
     isFinished,
     setIsFinished,
     showFeedback,
@@ -98,7 +99,7 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
   }
 
   if (isFinished) {
-    const percentage = Math.round((score / quizData.questions.length) * 100);
+    const percentage = Math.floor((correctAnswersCount / quizData.questions.length) * 100);
 
     return (
       <div className="flex-center min-h-screen p-4" style={backgroundStyle}>
@@ -141,7 +142,7 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
           </div>
 
           <p className="font-general text-3xl text-white mb-8">
-            You scored <span className="font-bold text-cyan-300">{score}</span> out of{' '}
+            You scored <span className="font-bold text-cyan-300">{correctAnswersCount}</span> out of{' '}
             <span className="font-bold text-cyan-300">{quizData.questions.length}</span>
           </p>
 
@@ -150,6 +151,7 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
               onClick={() => {
                 setCurrentQuestionIndex(0);
                 setScore(0);
+                setCorrectAnswersCount(0);
                 setSelectedAnswer(null);
                 setShowFeedback(false);
                 setIsFinished(false);

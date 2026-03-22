@@ -9,6 +9,7 @@ export function useQuizState(initialQuizData: QuizData | null) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [score, setScore] = useState(0);
+  const [correctAnswersCount, setCorrectAnswersCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
@@ -35,6 +36,7 @@ export function useQuizState(initialQuizData: QuizData | null) {
 
       if (isCorrect) {
         setScore(nextScore);
+        setCorrectAnswersCount((prev) => prev + 1);
       }
 
       setTimeout(() => {
@@ -69,6 +71,8 @@ export function useQuizState(initialQuizData: QuizData | null) {
     setSelectedAnswer,
     score,
     setScore,
+    correctAnswersCount,
+    setCorrectAnswersCount,
     isFinished,
     setIsFinished,
     showFeedback,
