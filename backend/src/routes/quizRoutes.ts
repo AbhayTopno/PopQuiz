@@ -6,16 +6,21 @@ import {
   getQuizById,
   updateQuiz,
 } from '../controllers/quiz.controller.js';
+import { protect, admin } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-// Route to generate a quiz using AI and save it to the database
 router.post('/generate', generateAndSaveQuiz);
 
-// Route for manual quiz creation
-router.route('/').post(createQuiz);
+// Manually create a quiz — admin only
+router.route('/').post(protect, admin, createQuiz);
 
-// Routes for fetching, updating, and deleting a specific quiz by its ID
-router.route('/:id').get(getQuizById).put(updateQuiz).delete(deleteQuiz);
+// Read a quiz — public (the game fetches quiz data for any player during a match)
+// Update / Delete a quiz — admin only
+router
+  .route('/:id')
+  .get(getQuizById)
+  .put(protect, admin, updateQuiz)
+  .delete(protect, admin, deleteQuiz);
 
 export default router;
