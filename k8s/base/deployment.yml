@@ -1,9 +1,10 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: redis
   namespace: popquiz
 spec:
+  serviceName: redis          # Must match the headless Redis Service name
   replicas: 1
   selector:
     matchLabels:
@@ -16,6 +17,9 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
+          # Enable AOF persistence: every write is logged to /data/appendonly.aof
+          # so data survives pod restarts and node reboots
+          command: ["redis-server", "--appendonly", "yes", "--dir", "/data"]
           ports:
             - containerPort: 6379
           resources:
@@ -25,10 +29,22 @@ spec:
             limits:
               cpu: '200m'
               memory: '256Mi'
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data    # Redis writes persistence files here
           securityContext:
             runAsNonRoot: true
             runAsUser: 999
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: true  # Safe: /data is a volume mount, not rootfs
+  # Automatically creates a PVC for each pod replica
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi          # 1GB is plenty for game room state
 ---
 apiVersion: apps/v1
 kind: Deployment
