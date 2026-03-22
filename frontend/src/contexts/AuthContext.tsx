@@ -43,6 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(userData);
       setIsAuthenticated(true);
       localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', data.token);
     } catch (error) {
       logError('Login error:', error);
       throw error;
@@ -75,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(userData);
       setIsAuthenticated(true);
       localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', data.token);
     } catch (error) {
       logError('Signup error:', error);
       throw error;
@@ -83,10 +85,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
+      const token = localStorage.getItem('token');
       await fetch(`${getApiUrl()}/api/auth/logout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
       });
     } catch (error) {
       logError('Logout error:', error);
@@ -94,6 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
     }
   };
 
@@ -113,8 +119,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const response = await fetch(`${getApiUrl()}/api/auth/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -142,16 +150,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const currentUser = useCallback(async () => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token');
+
       const response = await fetch(`${getApiUrl()}/api/auth/me`, {
         method: 'GET',
-        credentials: 'include',
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
-        setUser(null);
-        setIsAuthenticated(false);
-        localStorage.removeItem('user');
-        return;
+        throw new Error('Invalid token');
       }
 
       const data = await response.json();
@@ -171,6 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setIsAuthenticated(false);
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
       return;
     }
   }, []);

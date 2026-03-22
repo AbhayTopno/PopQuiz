@@ -19,8 +19,11 @@ export interface AuthRequest extends Request {
  * Verifies JWT token from cookies and attaches user to request
  */
 export const protect = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
-  // Read JWT from cookie
-  const token: string | undefined = req.cookies.jwt;
+  let token: string | undefined;
+
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
 
   if (token) {
     try {

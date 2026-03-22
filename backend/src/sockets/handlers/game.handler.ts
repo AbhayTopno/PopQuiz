@@ -3,6 +3,7 @@ import type { AuthSocket } from '../../middlewares/socketAuthMiddleware.js';
 import { AnswerSubmission, ScoreUpdate } from '../../types/index.js';
 import { PlayerRedisService } from '../../services/redis/player.redis.service.js';
 import { RoomRedisService } from '../../services/redis/room.redis.service.js';
+import { Quiz } from '../../models/quiz.js';
 
 export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
   socket.on('player-ready', async (data: { roomId: string }) => {
@@ -42,16 +43,35 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
       const player = await PlayerRedisService.getPlayer(roomId, socket.id);
 
       if (player) {
+        // --- Server-side answer validation ---
+        // Fetch the quizId from Redis room metadata, then verify the
+        // correct answer from MongoDB. We NEVER trust answer.isCorrect
+        // from the client, as a malicious player could always send true.
+        const room = await RoomRedisService.getRoom(roomId);
+        let isCorrect = false;
+
+        if (room?.quizId) {
+          const quiz = await Quiz.findById(room.quizId).lean();
+          const question = quiz?.questions?.[answer.questionIndex];
+          if (question) {
+            isCorrect = answer.answer === question.correctAnswer;
+          }
+        } else {
+          // Fallback: if room has no quizId (shouldn't happen), be safe and mark wrong
+          console.error(`submit-answer: could not find quizId for room ${roomId}`);
+        }
+        // --- End server-side validation ---
+
         const newAnswer = {
           questionIndex: answer.questionIndex,
           answer: answer.answer,
-          isCorrect: answer.isCorrect,
+          isCorrect,
           timestamp: Date.now(),
         };
         player.answers.push(newAnswer);
 
         let newScore = player.score;
-        if (answer.isCorrect) {
+        if (isCorrect) {
           newScore += 1;
         }
 
@@ -77,7 +97,7 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
           playerId: socket.id,
           username: player.username,
           questionIndex: answer.questionIndex,
-          isCorrect: answer.isCorrect,
+          isCorrect,
         });
       }
     } catch (error) {
