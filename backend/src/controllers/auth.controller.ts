@@ -13,13 +13,14 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
 
   try {
     const newUser = await AuthService.signupUser(username, email, password);
-    generateToken(res, newUser._id.toString());
+    const token = generateToken(newUser._id.toString());
 
     res.status(201).json({
       _id: newUser._id,
       username: newUser.username,
       email: newUser.email,
       isAdmin: newUser.isAdmin,
+      token,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -36,13 +37,14 @@ const login = asyncHandler(async (req: Request, res: Response) => {
 
   try {
     const user = await AuthService.loginUser(email, password);
-    generateToken(res, user._id.toString());
+    const token = generateToken(user._id.toString());
 
     res.status(200).json({
       _id: user._id,
       username: user.username,
       email: user.email,
       isAdmin: user.isAdmin,
+      token,
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -51,10 +53,6 @@ const login = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const logout = asyncHandler(async (req: Request, res: Response) => {
-  res.cookie('jwt', '', {
-    httpOnly: true,
-    expires: new Date(0),
-  });
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
