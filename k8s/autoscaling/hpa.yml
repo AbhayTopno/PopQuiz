@@ -48,7 +48,7 @@ metadata:
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
-    kind: Deployment
+    kind: StatefulSet       # Redis is now a StatefulSet
     name: redis
   minReplicas: 1
   maxReplicas: 3

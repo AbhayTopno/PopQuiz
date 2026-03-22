@@ -5,6 +5,7 @@ metadata:
   name: redis
   namespace: popquiz
 spec:
+  clusterIP: None       # Headless: required by the StatefulSet for stable pod DNS
   selector:
     app: redis
   ports:
