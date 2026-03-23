@@ -81,6 +81,7 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
           score: newScore,
           currentQuestionIndex: newQuestionIndex,
           answers: player.answers,
+          questionStartTime: Date.now(),
         });
 
         const scoreUpdate: ScoreUpdate = {
@@ -113,6 +114,7 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
       if (player) {
         await PlayerRedisService.updatePlayer(roomId, socket.id, {
           currentQuestionIndex: questionIndex,
+          questionStartTime: Date.now(),
         });
 
         io.to(roomId).emit('player-progress', {
@@ -171,6 +173,11 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
     try {
       const { roomId, quizId, duration } = data;
       await RoomRedisService.updateRoomStatus(roomId, { gameStarted: true });
+      const players = await PlayerRedisService.getAllPlayers(roomId);
+      const now = Date.now();
+      for (const p of players) {
+        await PlayerRedisService.updatePlayer(roomId, p.id, { questionStartTime: now });
+      }
       io.to(roomId).emit('quiz:start', { quizId, duration });
     } catch (error) {
       console.error('Error in quiz:start:', error);
@@ -184,12 +191,17 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
       await RoomRedisService.updateRoomStatus(roomId, { gameStarted: true });
 
       let countdown = 3;
-      const countdownInterval = setInterval(() => {
+      const countdownInterval = setInterval(async () => {
         if (countdown > 0) {
           io.to(roomId).emit('versus:countdown', countdown);
           countdown--;
         } else {
           clearInterval(countdownInterval);
+          const players = await PlayerRedisService.getAllPlayers(roomId);
+          const now = Date.now();
+          for (const p of players) {
+            await PlayerRedisService.updatePlayer(roomId, p.id, { questionStartTime: now });
+          }
           io.to(roomId).emit('quiz:start', { quizId, duration });
         }
       }, 1000);
@@ -223,6 +235,7 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
         await PlayerRedisService.updatePlayer(roomId, socket.id, {
           score,
           currentQuestionIndex: currentQuestion,
+          questionStartTime: Date.now(),
         });
 
         const scoreUpdateData = {
@@ -303,11 +316,19 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
     try {
       const { roomId, username } = data;
 
-      const existingPlayer = await PlayerRedisService.getPlayer(roomId, socket.id);
-      if (!existingPlayer) {
-        const player = {
+      const effectiveUsername = username || 'Player';
+      const allPlayers = await PlayerRedisService.getAllPlayers(roomId);
+      const existingPlayer = allPlayers.find((p) => p.username === effectiveUsername);
+
+      let player;
+      if (existingPlayer) {
+        await PlayerRedisService.removePlayer(roomId, existingPlayer.id);
+        player = { ...existingPlayer, id: socket.id };
+        await PlayerRedisService.addPlayer(roomId, player);
+      } else {
+        player = {
           id: socket.id,
-          username: username || 'Player',
+          username: effectiveUsername,
           score: 0,
           currentQuestionIndex: 0,
           answers: [],
@@ -319,6 +340,7 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
 
       socket.join(roomId);
 
+      // Re-fetch players to broadcast latest state
       const players = await PlayerRedisService.getAllPlayers(roomId);
       const playerList = players
         .map((p) => ({
@@ -344,12 +366,17 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
       await RoomRedisService.updateRoomStatus(roomId, { gameStarted: true });
 
       let countdown = 3;
-      const countdownInterval = setInterval(() => {
+      const countdownInterval = setInterval(async () => {
         if (countdown > 0) {
           io.to(roomId).emit('ffa:countdown', countdown);
           countdown--;
         } else {
           clearInterval(countdownInterval);
+          const players = await PlayerRedisService.getAllPlayers(roomId);
+          const now = Date.now();
+          for (const p of players) {
+            await PlayerRedisService.updatePlayer(roomId, p.id, { questionStartTime: now });
+          }
           io.to(roomId).emit('quiz:start', { quizId, duration });
         }
       }, 1000);
@@ -383,6 +410,7 @@ export const registerGameHandlers = (io: Server, socket: AuthSocket) => {
         await PlayerRedisService.updatePlayer(roomId, socket.id, {
           score,
           currentQuestionIndex: currentQuestion,
+          questionStartTime: Date.now(),
         });
 
         const scoreUpdateData = {

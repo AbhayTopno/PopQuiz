@@ -32,6 +32,7 @@ export default function ArenaClient({
     showFeedback,
     isFadingOut,
     handleNextBase,
+    overrideState,
   } = useQuizState(initialQuizData ?? null);
 
   const [selfFinished, setSelfFinished] = useState(false);
@@ -43,11 +44,19 @@ export default function ArenaClient({
     quizId: quizId || initialQuizData?._id,
     setScore,
     setIsFinished,
+    onReconnectState: (state) => {
+      overrideState(state.currentQuestionIndex, state.score);
+      const elapsed = (state.serverTime - state.questionStartTime) / 1000;
+      const remaining = Math.max(0, initialDuration - elapsed);
+      // Delay so that useQuizTimer's questionIndex effect runs first and doesn't overwrite
+      setTimeout(() => setTimeLeft(Math.floor(remaining)), 0);
+    },
   });
 
-  const { timeLeft, duration, handleProgressTransitionEnd } = useQuizTimer({
+  const { timeLeft, duration, handleProgressTransitionEnd, setTimeLeft } = useQuizTimer({
     initialDuration,
     isPaused: isFinished || selfFinished || showFeedback,
+    questionIndex: currentQuestionIndex,
     onTimeoutReveal: () => handleNext(null),
   });
 

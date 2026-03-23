@@ -13,6 +13,12 @@ type CoopSocketProps = {
     answer: string;
     isCorrect: boolean;
   }) => void;
+  onReconnectState?: (state: {
+    currentQuestionIndex: number;
+    score: number;
+    questionStartTime: number;
+    serverTime: number;
+  }) => void;
 };
 
 export function useCoopSocket({
@@ -21,6 +27,7 @@ export function useCoopSocket({
   quizId,
   setIsFinished,
   onAnswerLockedCallback,
+  onReconnectState,
 }: CoopSocketProps) {
   const { socket, connected } = useSocketConnection();
   const joinedRef = useRef(false);
@@ -62,18 +69,46 @@ export function useCoopSocket({
       setIsFinished(true);
     };
 
+    const onRoomState = (data: {
+      players: {
+        id: string;
+        username: string;
+        score: number;
+        currentQuestionIndex: number;
+        questionStartTime: number;
+      }[];
+      gameStarted: boolean;
+      serverTime: number;
+      teamScore?: number;
+    }) => {
+      if (!data.gameStarted) return;
+      if (data.teamScore !== undefined) setTeamScore(data.teamScore);
+
+      const me = data.players.find((p) => p.username === username || p.id === socket.id);
+      if (me && onReconnectState) {
+        onReconnectState({
+          currentQuestionIndex: me.currentQuestionIndex || 0,
+          score: me.score || 0,
+          questionStartTime: me.questionStartTime || Date.now(),
+          serverTime: data.serverTime || Date.now(),
+        });
+      }
+    };
+
     socket.on('coop-team-update', onTeamUpdate);
     socket.on('coop-answer-locked', onAnswerLocked);
     socket.on('coop-score-update', onScoreUpdate);
     socket.on('coop-quiz-complete', onQuizComplete);
+    socket.on('room-state', onRoomState);
 
     return () => {
       socket.off('coop-team-update', onTeamUpdate);
       socket.off('coop-answer-locked', onAnswerLocked);
       socket.off('coop-score-update', onScoreUpdate);
       socket.off('coop-quiz-complete', onQuizComplete);
+      socket.off('room-state', onRoomState);
     };
-  }, [socket, setIsFinished, onAnswerLockedCallback]);
+  }, [socket, setIsFinished, onAnswerLockedCallback, onReconnectState, username]);
 
   return { socket, connected, teamMembers, teamScore };
 }

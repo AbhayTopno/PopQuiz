@@ -18,6 +18,7 @@ export class PlayerRedisService {
       currentQuestionIndex: player.currentQuestionIndex.toString(),
       isReady: player.isReady.toString(),
       joinedAt: player.joinedAt.toString(),
+      questionStartTime: player.questionStartTime ? player.questionStartTime.toString() : '',
       answers: JSON.stringify(player.answers),
     };
 
@@ -53,6 +54,9 @@ export class PlayerRedisService {
       currentQuestionIndex: parseInt(playerData.currentQuestionIndex, 10),
       isReady: playerData.isReady === 'true',
       joinedAt: parseInt(playerData.joinedAt, 10),
+      questionStartTime: playerData.questionStartTime
+        ? parseInt(playerData.questionStartTime, 10)
+        : undefined,
       answers: JSON.parse(playerData.answers),
     };
   }
@@ -80,6 +84,9 @@ export class PlayerRedisService {
         currentQuestionIndex: parseInt(playerData.currentQuestionIndex, 10),
         isReady: playerData.isReady === 'true',
         joinedAt: parseInt(playerData.joinedAt, 10),
+        questionStartTime: playerData.questionStartTime
+          ? parseInt(playerData.questionStartTime, 10)
+          : undefined,
         answers: JSON.parse(playerData.answers),
       };
     });
@@ -112,6 +119,9 @@ export class PlayerRedisService {
         currentQuestionIndex: updates.currentQuestionIndex.toString(),
       }),
       ...(updates.isReady !== undefined && { isReady: updates.isReady.toString() }),
+      ...(updates.questionStartTime !== undefined && {
+        questionStartTime: updates.questionStartTime.toString(),
+      }),
       ...(updates.answers && { answers: JSON.stringify(updates.answers) }),
     };
 

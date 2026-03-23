@@ -1,25 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QuizData } from '@/types';
-import { getSocket } from '@/utils/socket';
 import { calculateScore, type Difficulty } from '@/utils/scoring';
+import { useTeamArenaSocket } from '@/hooks/arena/useTeamArenaSocket';
+import { useQuizTimer } from '@/hooks/quiz/useQuizTimer';
 import { getApiUrl } from '@/lib/config';
-
-type TeamMember = {
-  id: string;
-  username: string;
-  avatar?: string;
-};
-
-type Team = {
-  teamId: 'teamA' | 'teamB';
-  members: TeamMember[];
-  score: number;
-  currentQuestionIndex: number;
-  hasAnswered: boolean;
-};
 
 const FEEDBACK_DELAY_MS = 3000;
 
@@ -30,26 +17,73 @@ export default function CustomArenaClient() {
   const username = searchParams.get('username') || 'Player';
   const duration = parseInt(searchParams.get('duration') || '10');
 
-  const socket = useMemo(() => getSocket(), []);
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
 
-  // Team states
-  const [myTeamId, setMyTeamId] = useState<'teamA' | 'teamB' | null>(null);
-  const [myTeam, setMyTeam] = useState<Team | null>(null);
-  const [opponentTeam, setOpponentTeam] = useState<Team | null>(null);
-
   const [isFinished, setIsFinished] = useState(false);
   const [selfTeamFinished, setSelfTeamFinished] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number>(duration);
   const [isFadingOut, setIsFadingOut] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const joinedRef = useRef(false);
-  const [pendingTimeoutReveal, setPendingTimeoutReveal] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [answeringPlayer, setAnsweringPlayer] = useState<string | null>(null);
+
+  const { socket, connected, myTeamId, myTeam, opponentTeam } = useTeamArenaSocket({
+    roomId,
+    username,
+    quizId,
+    roomJoinEvent: 'join-custom-room',
+    setIsFinished,
+    setSelfTeamFinished,
+    onAnswerLockedCallback: (data, myId, myTeamData) => {
+      if (data.teamId === myId) {
+        const answeringMember = myTeamData?.members.find((m) => m.id === data.answeredBy);
+        if (answeringMember) {
+          setAnsweringPlayer(answeringMember.username);
+        }
+
+        if (data.answeredBy !== socket.id) {
+          setIsLocked(true);
+          setShowFeedback(true);
+          setSelectedAnswer(data.answer);
+        }
+
+        setTimeout(() => {
+          setIsFadingOut(true);
+          setTimeout(() => {
+            const nextIndex = currentQuestionIndex + 1;
+            if (nextIndex < (quizData?.questions.length || 0)) {
+              setCurrentQuestionIndex(nextIndex);
+              setSelectedAnswer(null);
+              setShowFeedback(false);
+              setTimeLeft(duration);
+              setIsFadingOut(false);
+              setIsLocked(false);
+              setAnsweringPlayer(null);
+            } else {
+              socket.emit('team-quiz-finished', { roomId, teamId: myId });
+              setSelfTeamFinished(true);
+            }
+          }, 300);
+        }, FEEDBACK_DELAY_MS);
+      }
+    },
+    onReconnectState: (state) => {
+      setCurrentQuestionIndex(state.currentQuestionIndex);
+      const elapsed = Math.floor((state.serverTime - state.questionStartTime) / 1000);
+      const remaining = Math.max(0, duration - elapsed);
+      setTimeLeft(remaining);
+    },
+  });
+
+  const { timeLeft, setTimeLeft, handleProgressTransitionEnd } = useQuizTimer({
+    initialDuration: duration,
+    isPaused: isFinished || selfTeamFinished || showFeedback || isLocked,
+    questionIndex: currentQuestionIndex,
+    onTimeoutReveal: () => {
+      handleNext(null);
+    },
+  });
 
   const backgroundStyle = {
     backgroundImage: `url(${'/img/Quiz.png'})`,
@@ -76,135 +110,9 @@ export default function CustomArenaClient() {
 
   useEffect(() => {
     setTimeLeft(duration);
-  }, [duration]);
+  }, [duration, setTimeLeft]);
 
-  // Socket connection and events
-  useEffect(() => {
-    const onConnect = () => {
-      setConnected(true);
-      if (!joinedRef.current && roomId) {
-        joinedRef.current = true;
-        socket.emit('join-custom-room', { roomId, quizId, username });
-      }
-    };
-    const onDisconnect = () => setConnected(false);
-
-    const onTeamAssignment = (data: { teamId: 'teamA' | 'teamB'; teams: Team[] }) => {
-      setMyTeamId(data.teamId);
-      const myTeamData = data.teams.find((t) => t.teamId === data.teamId);
-      const oppTeamData = data.teams.find((t) => t.teamId !== data.teamId);
-      if (myTeamData) setMyTeam(myTeamData);
-      if (oppTeamData) setOpponentTeam(oppTeamData);
-    };
-
-    const onTeamsUpdate = (data: { teams: Team[]; totalPlayers: number }) => {
-      if (!myTeamId) return;
-      const myTeamData = data.teams.find((t) => t.teamId === myTeamId);
-      const oppTeamData = data.teams.find((t) => t.teamId !== myTeamId);
-      if (myTeamData) setMyTeam(myTeamData);
-      if (oppTeamData) setOpponentTeam(oppTeamData);
-    };
-
-    const onTeamScoreUpdate = (data: {
-      teamId: 'teamA' | 'teamB';
-      score: number;
-      currentQuestion: number;
-      answeredBy: string;
-      answer: string | null;
-      isCorrect: boolean;
-    }) => {
-      if (data.teamId === myTeamId) {
-        setMyTeam((prev) => (prev ? { ...prev, score: data.score } : null));
-      } else {
-        setOpponentTeam((prev) => (prev ? { ...prev, score: data.score } : null));
-      }
-    };
-
-    const onTeamAnswerLocked = (data: {
-      teamId: 'teamA' | 'teamB';
-      currentQuestion: number;
-      answeredBy: string;
-      answer: string | null;
-      isCorrect: boolean;
-    }) => {
-      if (data.teamId === myTeamId) {
-        const answeringMember = myTeam?.members.find((m) => m.id === data.answeredBy);
-        if (answeringMember) {
-          setAnsweringPlayer(answeringMember.username);
-        }
-
-        if (data.answeredBy !== socket.id) {
-          setIsLocked(true);
-          setShowFeedback(true);
-          setSelectedAnswer(data.answer);
-        }
-
-        setTimeout(() => {
-          setIsFadingOut(true);
-          setTimeout(() => {
-            const nextIndex = currentQuestionIndex + 1;
-            if (nextIndex < (quizData?.questions.length || 0)) {
-              setCurrentQuestionIndex(nextIndex);
-              setSelectedAnswer(null);
-              setShowFeedback(false);
-              setTimeLeft(duration);
-              setIsFadingOut(false);
-              setIsLocked(false);
-              setAnsweringPlayer(null);
-            } else {
-              socket.emit('team-quiz-finished', { roomId, teamId: myTeamId });
-              setSelfTeamFinished(true);
-            }
-          }, 300);
-        }, FEEDBACK_DELAY_MS);
-      }
-    };
-
-    const onTeamFinished = (data: {
-      teamId: 'teamA' | 'teamB';
-      score: number;
-      members: TeamMember[];
-    }) => {
-      if (data.teamId === myTeamId) {
-        setSelfTeamFinished(true);
-        setMyTeam((prev) => (prev ? { ...prev, score: data.score } : null));
-      } else {
-        setOpponentTeam((prev) => (prev ? { ...prev, score: data.score } : null));
-      }
-    };
-
-    const onBattleComplete = (data: { teams: Team[] }) => {
-      const myFinalTeam = data.teams.find((t) => t.teamId === myTeamId);
-      const oppFinalTeam = data.teams.find((t) => t.teamId !== myTeamId);
-      if (myFinalTeam) setMyTeam(myFinalTeam);
-      if (oppFinalTeam) setOpponentTeam(oppFinalTeam);
-      setIsFinished(true);
-    };
-
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('team-assignment', onTeamAssignment);
-    socket.on('teams-update', onTeamsUpdate);
-    socket.on('team-score-update', onTeamScoreUpdate);
-    socket.on('team-answer-locked', onTeamAnswerLocked);
-    socket.on('team-finished', onTeamFinished);
-    socket.on('2v2-battle-complete', onBattleComplete);
-
-    if (socket.connected) onConnect();
-    else socket.connect();
-
-    return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('team-assignment', onTeamAssignment);
-      socket.off('teams-update', onTeamsUpdate);
-      socket.off('team-score-update', onTeamScoreUpdate);
-      socket.off('team-answer-locked', onTeamAnswerLocked);
-      socket.off('team-finished', onTeamFinished);
-      socket.off('2v2-battle-complete', onBattleComplete);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, roomId, username, quizId, myTeamId, currentQuestionIndex, duration]);
+  // Socket connection and events moved to hook
 
   const handleNext = useCallback(
     (selectedOption: string | null) => {
@@ -240,44 +148,7 @@ export default function CustomArenaClient() {
     prevScoreRef.current = myTeam?.score ?? 0;
   }, [myTeam?.score]);
 
-  // Timer
-  useEffect(() => {
-    if (isFinished || selfTeamFinished || showFeedback || isLocked) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (isFinished || selfTeamFinished || showFeedback || isLocked) return prev;
-
-        const next = prev - 1;
-        if (next <= 0) {
-          setPendingTimeoutReveal(true);
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [
-    isFinished,
-    selfTeamFinished,
-    showFeedback,
-    handleNext,
-    duration,
-    currentQuestionIndex,
-    isLocked,
-  ]);
-
-  const handleProgressTransitionEnd = useCallback(
-    (e: React.TransitionEvent<HTMLDivElement>) => {
-      if (e.propertyName !== 'width') return;
-      if (!pendingTimeoutReveal) return;
-      if (timeLeft > 0) return;
-      setPendingTimeoutReveal(false);
-      handleNext(null);
-    },
-    [pendingTimeoutReveal, timeLeft, handleNext],
-  );
+  // Timer functionality moved to useQuizTimer hook
 
   const getButtonClass = (option: string) => {
     if (!quizData) return '';

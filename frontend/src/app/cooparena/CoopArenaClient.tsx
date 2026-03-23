@@ -84,11 +84,18 @@ export default function CoopArenaClient({
     quizId: quizId || initialQuizData._id,
     setIsFinished,
     onAnswerLockedCallback,
+    onReconnectState: (state) => {
+      setCurrentQuestionIndex(state.currentQuestionIndex);
+      const elapsed = Math.floor((state.serverTime - state.questionStartTime) / 1000);
+      const remaining = Math.max(0, initialDuration - elapsed);
+      setTimeLeft(remaining);
+    },
   });
 
   const { timeLeft, duration, setTimeLeft, handleProgressTransitionEnd } = useQuizTimer({
     initialDuration,
     isPaused: isFinished || showFeedback,
+    questionIndex: currentQuestionIndex,
     onTimeoutReveal: () => {
       if (canAnswer) handleNext(null);
     },

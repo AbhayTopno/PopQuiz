@@ -34,6 +34,12 @@ type TeamArenaSocketProps = {
     myTeamId: 'teamA' | 'teamB' | null,
     myTeam: Team | null,
   ) => void;
+  onReconnectState?: (state: {
+    currentQuestionIndex: number;
+    score: number;
+    questionStartTime: number;
+    serverTime: number;
+  }) => void;
 };
 
 export function useTeamArenaSocket({
@@ -44,6 +50,7 @@ export function useTeamArenaSocket({
   setIsFinished,
   setSelfTeamFinished,
   onAnswerLockedCallback,
+  onReconnectState,
 }: TeamArenaSocketProps) {
   const { socket, connected } = useSocketConnection();
   const joinedRef = useRef(false);
@@ -132,12 +139,36 @@ export function useTeamArenaSocket({
       });
     };
 
+    const onRoomState = (data: {
+      players: {
+        id: string;
+        username: string;
+        score: number;
+        currentQuestionIndex: number;
+        questionStartTime: number;
+      }[];
+      gameStarted: boolean;
+      serverTime: number;
+    }) => {
+      if (!data.gameStarted) return;
+      const me = data.players.find((p) => p.username === username || p.id === socket.id);
+      if (me && onReconnectState) {
+        onReconnectState({
+          currentQuestionIndex: me.currentQuestionIndex || 0,
+          score: me.score || 0,
+          questionStartTime: me.questionStartTime || Date.now(),
+          serverTime: data.serverTime || Date.now(),
+        });
+      }
+    };
+
     socket.on('team-assignment', onTeamAssignment);
     socket.on('teams-update', onTeamsUpdate);
     socket.on('team-score-update', onTeamScoreUpdate);
     socket.on('team-answer-locked', onTeamAnswerLocked);
     socket.on('team-finished', onTeamFinished);
     socket.on('2v2-battle-complete', onBattleComplete);
+    socket.on('room-state', onRoomState);
 
     return () => {
       socket.off('team-assignment', onTeamAssignment);
@@ -146,8 +177,16 @@ export function useTeamArenaSocket({
       socket.off('team-answer-locked', onTeamAnswerLocked);
       socket.off('team-finished', onTeamFinished);
       socket.off('2v2-battle-complete', onBattleComplete);
+      socket.off('room-state', onRoomState);
     };
-  }, [socket, setIsFinished, setSelfTeamFinished, onAnswerLockedCallback]);
+  }, [
+    socket,
+    setIsFinished,
+    setSelfTeamFinished,
+    onAnswerLockedCallback,
+    onReconnectState,
+    username,
+  ]);
 
   return { socket, connected, myTeamId, myTeam, opponentTeam };
 }

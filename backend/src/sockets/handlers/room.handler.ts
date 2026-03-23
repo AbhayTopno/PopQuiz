@@ -54,18 +54,29 @@ export const registerRoomHandlers = (io: Server, socket: AuthSocket) => {
           return;
         }
 
-        const player: Player = {
-          id: socket.id,
-          username: effectiveUsername,
-          avatar: effectiveAvatar,
-          score: 0,
-          currentQuestionIndex: 0,
-          answers: [],
-          isReady: false,
-          joinedAt: Date.now(),
-        };
+        const allPlayers = await PlayerRedisService.getAllPlayers(roomId);
+        const existingPlayer = allPlayers.find((p) => p.username === effectiveUsername);
 
-        await PlayerRedisService.addPlayer(roomId, player);
+        let player: Player;
+        if (existingPlayer) {
+          // Reconnect logic: move their old data to the new socket.id key
+          await PlayerRedisService.removePlayer(roomId, existingPlayer.id);
+          player = { ...existingPlayer, id: socket.id };
+          await PlayerRedisService.addPlayer(roomId, player);
+        } else {
+          player = {
+            id: socket.id,
+            username: effectiveUsername,
+            avatar: effectiveAvatar,
+            score: 0,
+            currentQuestionIndex: 0,
+            answers: [],
+            isReady: false,
+            joinedAt: Date.now(),
+          };
+          await PlayerRedisService.addPlayer(roomId, player);
+        }
+
         socket.join(roomId);
 
         const totalPlayers = await PlayerRedisService.getPlayerCount(roomId);
@@ -91,6 +102,9 @@ export const registerRoomHandlers = (io: Server, socket: AuthSocket) => {
           avatar: p.avatar,
           score: p.score,
           isReady: p.isReady,
+          currentQuestionIndex: p.currentQuestionIndex,
+          questionStartTime: p.questionStartTime,
+          answers: p.answers,
         }));
 
         socket.emit('room-state', {
@@ -99,6 +113,7 @@ export const registerRoomHandlers = (io: Server, socket: AuthSocket) => {
           teamAssignments: teamAssignments || { teamA: [], teamB: [] },
           gameStarted: roomState?.gameStarted || false,
           gameFinished: roomState?.gameFinished || false,
+          serverTime: Date.now(),
         });
 
         const systemMessage: ChatMessage = {
@@ -123,9 +138,17 @@ export const registerRoomHandlers = (io: Server, socket: AuthSocket) => {
 
       for (const roomId of roomIds) {
         const player = await PlayerRedisService.getPlayer(roomId, socket.id);
+        const room = await RoomRedisService.getRoom(roomId);
 
         if (player) {
-          await PlayerRedisService.removePlayer(roomId, socket.id);
+          // Do not delete player from Redis if the game is active. They might reconnect.
+          if (room && room.gameStarted && !room.gameFinished) {
+            // Give them a grace period or just leave them in Redis.
+            // We can emit player-disconnected so frontend knows they dropped, but don't remove.
+          } else {
+            // If game hasn't started or is finished, clean them up immediately
+            await PlayerRedisService.removePlayer(roomId, socket.id);
+          }
 
           const remainingPlayers = await PlayerRedisService.getPlayerCount(roomId);
 

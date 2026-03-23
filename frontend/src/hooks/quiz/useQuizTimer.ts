@@ -3,17 +3,28 @@ import { useState, useEffect, useCallback } from 'react';
 type QuizTimerProps = {
   initialDuration: number;
   isPaused: boolean;
+  questionIndex: number;
   onTimeoutReveal: () => void;
 };
 
-export function useQuizTimer({ initialDuration, isPaused, onTimeoutReveal }: QuizTimerProps) {
+export function useQuizTimer({
+  initialDuration,
+  isPaused,
+  questionIndex,
+  onTimeoutReveal,
+}: QuizTimerProps) {
   const [timeLeft, setTimeLeft] = useState<number>(initialDuration);
   const [duration, setDuration] = useState<number>(initialDuration);
   const [pendingTimeoutReveal, setPendingTimeoutReveal] = useState(false);
+  const [lastQuestionIndex, setLastQuestionIndex] = useState(questionIndex);
 
   useEffect(() => {
-    setTimeLeft(duration);
-  }, [duration]);
+    if (questionIndex !== lastQuestionIndex) {
+      setTimeLeft(duration);
+      setLastQuestionIndex(questionIndex);
+      setPendingTimeoutReveal(false);
+    }
+  }, [questionIndex, duration, lastQuestionIndex]);
 
   useEffect(() => {
     if (isPaused) return;

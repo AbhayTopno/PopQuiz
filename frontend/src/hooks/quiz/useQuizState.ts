@@ -63,6 +63,14 @@ export function useQuizState(initialQuizData: QuizData | null) {
     [quizData, currentQuestionIndex, score],
   );
 
+  const overrideState = useCallback((index: number, newScore: number) => {
+    setCurrentQuestionIndex(index);
+    setScore(newScore);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+    setIsFadingOut(false);
+  }, []);
+
   return {
     quizData,
     currentQuestionIndex,
@@ -80,5 +88,6 @@ export function useQuizState(initialQuizData: QuizData | null) {
     isFadingOut,
     setIsFadingOut,
     handleNextBase,
+    overrideState,
   };
 }

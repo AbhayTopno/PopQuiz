@@ -30,6 +30,7 @@ export default function QuizClient({ initialQuizData, initialDuration }: Props) 
   const { timeLeft, duration, setTimeLeft, handleProgressTransitionEnd } = useQuizTimer({
     initialDuration: initialDuration ?? 10,
     isPaused: isLoading || isFinished || showFeedback,
+    questionIndex: currentQuestionIndex,
     onTimeoutReveal: () => handleNext(null),
   });
 
