@@ -1,21 +1,14 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QuizData } from '@/types';
-import { getSocket } from '@/utils/socket';
 import { calculateScore, type Difficulty } from '@/utils/scoring';
 import CompactLeaderboard, { type CompactPlayer } from '@/components/CompactLeaderboard';
 import TimerBar from '@/components/TimerBar';
+import { useFFASocket } from '@/hooks/arena/useFFASocket';
+import { useQuizTimer } from '@/hooks/quiz/useQuizTimer';
 import { getApiUrl } from '@/lib/config';
-
-type FFAPlayer = {
-  id: string;
-  username: string;
-  avatar?: string;
-  score: number;
-  finished: boolean;
-};
 
 const FEEDBACK_DELAY_MS = 3000;
 
@@ -26,20 +19,39 @@ export default function FFAArenaClient() {
   const username = searchParams.get('username') || 'Player';
   const duration = parseInt(searchParams.get('duration') || '10');
 
-  const socket = useMemo(() => getSocket(), []);
   const [quizData, setQuizData] = useState<QuizData | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [score, setScore] = useState(0);
-  const [players, setPlayers] = useState<FFAPlayer[]>([]);
   const [isFinished, setIsFinished] = useState(false);
   const [selfFinished, setSelfFinished] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number>(duration);
   const [isFadingOut, setIsFadingOut] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const joinedRef = useRef(false);
-  const [pendingTimeoutReveal, setPendingTimeoutReveal] = useState(false);
+
+  const { socket, connected, players } = useFFASocket({
+    roomId,
+    username,
+    quizId,
+    setScore,
+    setIsFinished,
+    setSelfFinished,
+    onReconnectState: (state) => {
+      setCurrentQuestionIndex(state.currentQuestionIndex);
+      setScore(state.score);
+      const elapsed = Math.floor((state.serverTime - state.questionStartTime) / 1000);
+      const remaining = Math.max(0, duration - elapsed);
+      setTimeLeft(remaining);
+    },
+  });
+
+  const { timeLeft, setTimeLeft, handleProgressTransitionEnd } = useQuizTimer({
+    initialDuration: duration,
+    isPaused: isFinished || selfFinished || showFeedback,
+    questionIndex: currentQuestionIndex,
+    onTimeoutReveal: () => {
+      handleNext(null);
+    },
+  });
 
   const backgroundStyle = {
     backgroundImage: `url(${'/img/Quiz.png'})`,
@@ -66,92 +78,10 @@ export default function FFAArenaClient() {
 
   useEffect(() => {
     setTimeLeft(duration);
-  }, [duration]);
+  }, [duration, setTimeLeft]);
 
-  // Socket connection and events
-  useEffect(() => {
-    const onConnect = () => {
-      setConnected(true);
-      if (!joinedRef.current && roomId) {
-        joinedRef.current = true;
-        socket.emit('join-ffa-room', { roomId, quizId, username });
-      }
-    };
-    const onDisconnect = () => setConnected(false);
-
-    // FFA player list update
-    const onFFAPlayersUpdate = (data: { players: FFAPlayer[] }) => {
-      setPlayers(data.players);
-      // Update my score from the list
-      const me = data.players.find((p) => p.id === socket.id);
-      if (me) {
-        setScore(me.score);
-        // Check if I'm finished
-        if (me.finished) {
-          setSelfFinished(true);
-        }
-      }
-
-      // Check if all players are finished
-      const allFinished = data.players.length > 0 && data.players.every((p) => p.finished);
-      if (allFinished && data.players.length >= 2) {
-        setIsFinished(true);
-      }
-    };
-
-    // Score update broadcast
-    const onFFAScoreUpdate = (data: {
-      playerId: string;
-      username: string;
-      score: number;
-      currentQuestion: number;
-      finished: boolean;
-    }) => {
-      if (data.playerId === socket.id) {
-        setScore(data.score);
-      }
-      // Update in players list
-      setPlayers((prev) =>
-        prev.map((p) =>
-          p.id === data.playerId ? { ...p, score: data.score, finished: data.finished } : p,
-        ),
-      );
-    };
-
-    // Player finished
-    const onFFAPlayerFinished = (data: { playerId: string; username: string; score: number }) => {
-      setPlayers((prev) =>
-        prev.map((p) => (p.id === data.playerId ? { ...p, score: data.score, finished: true } : p)),
-      );
-    };
-
-    // Battle complete
-    const onFFABattleComplete = (data: { players: FFAPlayer[] }) => {
-      setPlayers(data.players);
-      const me = data.players.find((p) => p.id === socket.id);
-      if (me) setScore(me.score);
-      setIsFinished(true);
-    };
-
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('ffa-players-update', onFFAPlayersUpdate);
-    socket.on('ffa-score-update', onFFAScoreUpdate);
-    socket.on('ffa-player-finished', onFFAPlayerFinished);
-    socket.on('ffa-battle-complete', onFFABattleComplete);
-
-    if (socket.connected) onConnect();
-    else socket.connect();
-
-    return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('ffa-players-update', onFFAPlayersUpdate);
-      socket.off('ffa-score-update', onFFAScoreUpdate);
-      socket.off('ffa-player-finished', onFFAPlayerFinished);
-      socket.off('ffa-battle-complete', onFFABattleComplete);
-    };
-  }, [socket, roomId, username, quizId]);
+  // Timer functionality moved to hook or kept here if needed
+  // (We'll keep the interval timer here for now as useFFASocket doesn't manage timeLeft yet)
 
   const handleNext = useCallback(
     (selectedOption: string | null) => {
@@ -205,7 +135,7 @@ export default function FFAArenaClient() {
         }, 300);
       }, FEEDBACK_DELAY_MS);
     },
-    [quizData, currentQuestionIndex, duration, roomId, socket, username, timeLeft],
+    [quizData, currentQuestionIndex, duration, roomId, socket, username, timeLeft, setTimeLeft],
   );
 
   const prevScoreRef = useRef(score);
@@ -213,36 +143,7 @@ export default function FFAArenaClient() {
     prevScoreRef.current = score;
   }, [score]);
 
-  // Timer
-  useEffect(() => {
-    if (isFinished || selfFinished || showFeedback) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (isFinished || selfFinished || showFeedback) return prev;
-
-        const next = prev - 1;
-        if (next <= 0) {
-          setPendingTimeoutReveal(true);
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isFinished, selfFinished, showFeedback, handleNext, duration, currentQuestionIndex]);
-
-  const handleProgressTransitionEnd = useCallback(
-    (e: React.TransitionEvent<HTMLDivElement>) => {
-      if (e.propertyName !== 'width') return;
-      if (!pendingTimeoutReveal) return;
-      if (timeLeft > 0) return;
-      setPendingTimeoutReveal(false);
-      handleNext(null);
-    },
-    [pendingTimeoutReveal, timeLeft, handleNext],
-  );
+  // Timer functionality moved to useQuizTimer hook
 
   const getButtonClass = (option: string) => {
     if (!quizData) return '';

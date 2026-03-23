@@ -16,6 +16,12 @@ type FFASocketProps = {
   setScore: (score: number) => void;
   setIsFinished: (finished: boolean) => void;
   setSelfFinished: (finished: boolean) => void;
+  onReconnectState?: (state: {
+    currentQuestionIndex: number;
+    score: number;
+    questionStartTime: number;
+    serverTime: number;
+  }) => void;
 };
 
 export function useFFASocket({
@@ -25,6 +31,7 @@ export function useFFASocket({
   setScore,
   setIsFinished,
   setSelfFinished,
+  onReconnectState,
 }: FFASocketProps) {
   const { socket, connected } = useSocketConnection();
   const joinedRef = useRef(false);
@@ -83,18 +90,37 @@ export function useFFASocket({
       setIsFinished(true);
     };
 
+    const onRoomState = (data: {
+      players: (FFAPlayer & { currentQuestionIndex: number; questionStartTime: number })[];
+      gameStarted: boolean;
+      serverTime: number;
+    }) => {
+      if (!data.gameStarted) return;
+      const me = data.players.find((p) => p.username === username || p.id === socket.id);
+      if (me && onReconnectState) {
+        onReconnectState({
+          currentQuestionIndex: me.currentQuestionIndex || 0,
+          score: me.score || 0,
+          questionStartTime: me.questionStartTime || Date.now(),
+          serverTime: data.serverTime || Date.now(),
+        });
+      }
+    };
+
     socket.on('ffa-players-update', onFFAPlayersUpdate);
     socket.on('ffa-score-update', onFFAScoreUpdate);
     socket.on('ffa-player-finished', onFFAPlayerFinished);
     socket.on('ffa-battle-complete', onFFABattleComplete);
+    socket.on('room-state', onRoomState);
 
     return () => {
       socket.off('ffa-players-update', onFFAPlayersUpdate);
       socket.off('ffa-score-update', onFFAScoreUpdate);
       socket.off('ffa-player-finished', onFFAPlayerFinished);
       socket.off('ffa-battle-complete', onFFABattleComplete);
+      socket.off('room-state', onRoomState);
     };
-  }, [socket, setScore, setIsFinished, setSelfFinished]);
+  }, [socket, setScore, setIsFinished, setSelfFinished, onReconnectState, username]);
 
   return { socket, connected, players };
 }

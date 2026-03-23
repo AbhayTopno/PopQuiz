@@ -9,6 +9,23 @@ type LeaderboardEntry = {
   currentQuestionIndex: number;
 };
 
+type PlayerState = {
+  id: string;
+  username: string;
+  score: number;
+  currentQuestionIndex: number;
+  questionStartTime: number;
+};
+
+type RoomStateData = {
+  roomType: string;
+  gameStarted: boolean;
+  gameFinished: boolean;
+  quizId: string;
+  players: PlayerState[];
+  serverTime: number;
+};
+
 type ArenaSocketProps = {
   roomId: string;
   username: string;
@@ -21,9 +38,16 @@ export function useArenaSocket({
   quizId,
   setScore,
   setIsFinished,
+  onReconnectState,
 }: ArenaSocketProps & {
   setScore: (score: number) => void;
   setIsFinished: (finished: boolean) => void;
+  onReconnectState?: (state: {
+    currentQuestionIndex: number;
+    score: number;
+    questionStartTime: number;
+    serverTime: number;
+  }) => void;
 }) {
   const { socket, connected } = useSocketConnection();
   const joinedRef = useRef(false);
@@ -85,18 +109,36 @@ export function useArenaSocket({
       setIsFinished(true);
     };
 
+    const onRoomState = (data: RoomStateData) => {
+      if (!data.gameStarted) return;
+      if (!socket.id) return;
+      const me = data.players.find(
+        (p: PlayerState) => p.username === username || p.id === socket.id,
+      );
+      if (me && onReconnectState) {
+        onReconnectState({
+          currentQuestionIndex: me.currentQuestionIndex || 0,
+          score: me.score || 0,
+          questionStartTime: me.questionStartTime || Date.now(),
+          serverTime: data.serverTime || Date.now(),
+        });
+      }
+    };
+
     socket.on('score-update-broadcast', onScoreBroadcast);
     socket.on('leaderboard-update', onLeaderboard);
     socket.on('opponent-finished', onOpponentFinished);
     socket.on('battle-complete', onBattleComplete);
+    socket.on('room-state', onRoomState);
 
     return () => {
       socket.off('score-update-broadcast', onScoreBroadcast);
       socket.off('leaderboard-update', onLeaderboard);
       socket.off('opponent-finished', onOpponentFinished);
       socket.off('battle-complete', onBattleComplete);
+      socket.off('room-state', onRoomState);
     };
-  }, [socket, setIsFinished, setScore]);
+  }, [socket, setIsFinished, setScore, onReconnectState, username]);
 
   return {
     socket,

@@ -10,6 +10,7 @@ export interface Player {
   avatar?: string;
   score: number;
   currentQuestionIndex: number;
+  questionStartTime?: number;
   answers: { questionIndex: number; answer: string; isCorrect: boolean; timestamp: number }[];
   isReady: boolean;
   joinedAt: number;

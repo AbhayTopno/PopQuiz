@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { QuizData } from '@/types';
-import { getSocket } from '@/utils/socket';
+import { useQuizTimer } from '@/hooks/quiz/useQuizTimer';
 import { calculateScore, type Difficulty } from '@/utils/scoring';
+import { useTeamArenaSocket } from '@/hooks/arena/useTeamArenaSocket';
 
 type ArenaClientProps = {
   roomId: string;
@@ -11,20 +12,6 @@ type ArenaClientProps = {
   initialQuizData: QuizData;
   initialDuration?: number;
   quizId?: string;
-};
-
-type TeamMember = {
-  id: string;
-  username: string;
-  avatar?: string;
-};
-
-type Team = {
-  teamId: 'teamA' | 'teamB';
-  members: TeamMember[];
-  score: number;
-  currentQuestionIndex: number;
-  hasAnswered: boolean;
 };
 
 const FEEDBACK_DELAY_MS = 3000;
@@ -36,97 +23,31 @@ export default function ArenaClient({
   initialDuration = 10,
   quizId,
 }: ArenaClientProps) {
-  const socket = useMemo(() => getSocket(), []);
-  const [quizData] = useState<QuizData | null>(initialQuizData ?? null);
+  const quizData = initialQuizData;
+  const duration = initialDuration;
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-
-  // Team states instead of individual opponent
-  const [myTeamId, setMyTeamId] = useState<'teamA' | 'teamB' | null>(null);
-  const [myTeam, setMyTeam] = useState<Team | null>(null);
-  const [opponentTeam, setOpponentTeam] = useState<Team | null>(null);
 
   const [isFinished, setIsFinished] = useState(false);
   const [selfTeamFinished, setSelfTeamFinished] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number>(initialDuration);
-  const [duration] = useState<number>(initialDuration);
   const [isFadingOut, setIsFadingOut] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const joinedRef = useRef(false);
-  const [pendingTimeoutReveal, setPendingTimeoutReveal] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [answeringPlayer, setAnsweringPlayer] = useState<string | null>(null);
 
-  const backgroundStyle = {
-    backgroundImage: `url(${'/img/Quiz.png'})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-  } as const;
-
-  useEffect(() => {
-    setTimeLeft(duration);
-  }, [duration]);
-
-  // Connect/join if needed and wire events
-  useEffect(() => {
-    const onConnect = () => {
-      setConnected(true);
-      // Join 2v2 room
-      if (!joinedRef.current && roomId) {
-        joinedRef.current = true;
-        socket.emit('join-2v2-room', { roomId, quizId: quizId || initialQuizData._id, username });
-      }
-    };
-    const onDisconnect = () => setConnected(false);
-
-    // Receive team assignment when joining
-    const onTeamAssignment = (data: { teamId: 'teamA' | 'teamB'; teams: Team[] }) => {
-      setMyTeamId(data.teamId);
-      const myTeamData = data.teams.find((t) => t.teamId === data.teamId);
-      const oppTeamData = data.teams.find((t) => t.teamId !== data.teamId);
-      if (myTeamData) setMyTeam(myTeamData);
-      if (oppTeamData) setOpponentTeam(oppTeamData);
-    };
-
-    // Teams update when players join/leave (broadcasted to all players)
-    const onTeamsUpdate = (data: { teams: Team[]; totalPlayers: number }) => {
-      if (!myTeamId) return; // Wait until we know our team
-      const myTeamData = data.teams.find((t) => t.teamId === myTeamId);
-      const oppTeamData = data.teams.find((t) => t.teamId !== myTeamId);
-      if (myTeamData) setMyTeam(myTeamData);
-      if (oppTeamData) setOpponentTeam(oppTeamData);
-    };
-
-    // Team score updates (real-time score broadcasting for both teams)
-    const onTeamScoreUpdate = (data: {
-      teamId: 'teamA' | 'teamB';
-      score: number;
-      currentQuestion: number;
-      answeredBy: string;
-      answer: string | null;
-      isCorrect: boolean;
-    }) => {
-      if (data.teamId === myTeamId) {
-        setMyTeam((prev) => (prev ? { ...prev, score: data.score } : null));
-      } else {
-        setOpponentTeam((prev) => (prev ? { ...prev, score: data.score } : null));
-      }
-    };
-
-    // COOP MECHANIC: When ANY teammate answers, ALL team members see same feedback and advance together
-    const onTeamAnswerLocked = (data: {
-      teamId: 'teamA' | 'teamB';
-      currentQuestion: number;
-      answeredBy: string;
-      answer: string | null;
-      isCorrect: boolean;
-    }) => {
+  const { socket, connected, myTeamId, myTeam, opponentTeam } = useTeamArenaSocket({
+    roomId,
+    username,
+    quizId: quizId || initialQuizData._id,
+    roomJoinEvent: 'join-2v2-room',
+    setIsFinished,
+    setSelfTeamFinished,
+    onAnswerLockedCallback: (data, myId, myTeamData) => {
       // Process if it's MY team (regardless of who answered)
-      if (data.teamId === myTeamId) {
+      if (data.teamId === myId) {
         // Find the answering player's name
-        const answeringMember = myTeam?.members.find((m) => m.id === data.answeredBy);
+        const answeringMember = myTeamData?.members.find((m) => m.id === data.answeredBy);
         if (answeringMember) {
           setAnsweringPlayer(answeringMember.username);
         }
@@ -137,88 +58,58 @@ export default function ArenaClient({
           setShowFeedback(true);
           setSelectedAnswer(data.answer);
         }
-        // Note: If I AM the answering player, handleNext already set showFeedback and selectedAnswer
 
         // ALL team members advance together after feedback delay
         setTimeout(() => {
           setIsFadingOut(true);
           setTimeout(() => {
             const nextIndex = currentQuestionIndex + 1;
-            if (nextIndex < quizData!.questions.length) {
+            if (nextIndex < initialQuizData.questions.length) {
               setCurrentQuestionIndex(nextIndex);
               setSelectedAnswer(null);
               setShowFeedback(false);
-              setTimeLeft(duration);
+              setTimeLeft(initialDuration);
               setIsFadingOut(false);
               setIsLocked(false);
               setAnsweringPlayer(null);
             } else {
-              // Quiz finished - ALL team members emit finish (not just answering player)
-              socket.emit('team-quiz-finished', { roomId, teamId: myTeamId });
-              // All players should see waiting/finished state
+              socket.emit('team-quiz-finished', { roomId, teamId: myId });
               setSelfTeamFinished(true);
             }
           }, 300);
         }, FEEDBACK_DELAY_MS);
       }
-    };
+    },
+    onReconnectState: (state) => {
+      setCurrentQuestionIndex(state.currentQuestionIndex);
+      // Score is handled by the hook's myTeam state
+      const elapsed = Math.floor((state.serverTime - state.questionStartTime) / 1000);
+      const remaining = Math.max(0, initialDuration - elapsed);
+      setTimeLeft(remaining);
+    },
+  });
 
-    // When a team finishes
-    const onTeamFinished = (data: {
-      teamId: 'teamA' | 'teamB';
-      score: number;
-      members: TeamMember[];
-    }) => {
-      if (data.teamId === myTeamId) {
-        setSelfTeamFinished(true);
-        setMyTeam((prev) => (prev ? { ...prev, score: data.score } : null));
-      } else {
-        setOpponentTeam((prev) => (prev ? { ...prev, score: data.score } : null));
-      }
-    };
+  const { timeLeft, setTimeLeft, handleProgressTransitionEnd } = useQuizTimer({
+    initialDuration: duration,
+    isPaused: isFinished || selfTeamFinished || showFeedback || isLocked,
+    questionIndex: currentQuestionIndex,
+    onTimeoutReveal: () => {
+      handleNext(null);
+    },
+  });
 
-    // Battle complete - both teams finished
-    const onBattleComplete = (data: { teams: Team[] }) => {
-      const myFinalTeam = data.teams.find((t) => t.teamId === myTeamId);
-      const oppFinalTeam = data.teams.find((t) => t.teamId !== myTeamId);
-      if (myFinalTeam) setMyTeam(myFinalTeam);
-      if (oppFinalTeam) setOpponentTeam(oppFinalTeam);
-      setIsFinished(true);
-    };
+  const backgroundStyle = {
+    backgroundImage: `url(${'/img/Quiz.png'})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  } as const;
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('team-assignment', onTeamAssignment);
-    socket.on('teams-update', onTeamsUpdate);
-    socket.on('team-score-update', onTeamScoreUpdate);
-    socket.on('team-answer-locked', onTeamAnswerLocked);
-    socket.on('team-finished', onTeamFinished);
-    socket.on('2v2-battle-complete', onBattleComplete);
+  useEffect(() => {
+    setTimeLeft(duration);
+  }, [duration, setTimeLeft]);
 
-    if (socket.connected) onConnect();
-    else socket.connect();
-
-    return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('team-assignment', onTeamAssignment);
-      socket.off('teams-update', onTeamsUpdate);
-      socket.off('team-score-update', onTeamScoreUpdate);
-      socket.off('team-answer-locked', onTeamAnswerLocked);
-      socket.off('team-finished', onTeamFinished);
-      socket.off('2v2-battle-complete', onBattleComplete);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    socket,
-    roomId,
-    username,
-    quizId,
-    initialQuizData?._id,
-    myTeamId,
-    currentQuestionIndex,
-    duration,
-  ]);
+  // Socket connection and events moved to hook
 
   // Note: score updates are emitted inline where state changes to avoid stale closures
   const handleNext = useCallback(
@@ -264,47 +155,7 @@ export default function ArenaClient({
     prevScoreRef.current = myTeam?.score ?? 0;
   }, [myTeam?.score]);
 
-  // Timer
-  useEffect(() => {
-    if (isFinished || selfTeamFinished || showFeedback || isLocked) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        // Avoid triggering transitions if we've already finished or are showing feedback
-        if (isFinished || selfTeamFinished || showFeedback || isLocked) return prev;
-
-        const next = prev - 1;
-        if (next <= 0) {
-          // Show 0s and wait until the progress bar width reaches zero, then reveal
-          setPendingTimeoutReveal(true);
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [
-    isFinished,
-    selfTeamFinished,
-    showFeedback,
-    handleNext,
-    duration,
-    currentQuestionIndex,
-    isLocked,
-  ]);
-
-  // When the progress bar finishes shrinking to zero width, reveal the answer for timeout
-  const handleProgressTransitionEnd = useCallback(
-    (e: React.TransitionEvent<HTMLDivElement>) => {
-      if (e.propertyName !== 'width') return;
-      if (!pendingTimeoutReveal) return;
-      if (timeLeft > 0) return;
-      setPendingTimeoutReveal(false);
-      handleNext(null);
-    },
-    [pendingTimeoutReveal, timeLeft, handleNext],
-  );
+  // Timer functionality moved to useQuizTimer hook
 
   // UI helpers
   const getButtonClass = (option: string) => {

@@ -76,18 +76,28 @@ export const registerTeamHandlers = (io: Server, socket: AuthSocket) => {
           return;
         }
 
-        const player: Player = {
-          id: socket.id,
-          username: effectiveUsername,
-          avatar: effectiveAvatar,
-          score: 0,
-          currentQuestionIndex: 0,
-          answers: [],
-          isReady: false,
-          joinedAt: Date.now(),
-        };
+        const allPlayersPrev = await PlayerRedisService.getAllPlayers(roomId);
+        const existingPlayer = allPlayersPrev.find((p) => p.username === effectiveUsername);
 
-        await PlayerRedisService.addPlayer(roomId, player);
+        let player: Player;
+        if (existingPlayer) {
+          await PlayerRedisService.removePlayer(roomId, existingPlayer.id);
+          player = { ...existingPlayer, id: socket.id };
+          await PlayerRedisService.addPlayer(roomId, player);
+        } else {
+          player = {
+            id: socket.id,
+            username: effectiveUsername,
+            avatar: effectiveAvatar,
+            score: 0,
+            currentQuestionIndex: 0,
+            answers: [],
+            isReady: false,
+            joinedAt: Date.now(),
+          };
+          await PlayerRedisService.addPlayer(roomId, player);
+        }
+
         socket.join(roomId);
 
         let teamAssignments = await TeamRedisService.getTeamAssignments(roomId);
@@ -394,18 +404,28 @@ export const registerTeamHandlers = (io: Server, socket: AuthSocket) => {
           return;
         }
 
-        const player: Player = {
-          id: socket.id,
-          username: effectiveUsername,
-          avatar: effectiveAvatar,
-          score: 0,
-          currentQuestionIndex: 0,
-          answers: [],
-          isReady: false,
-          joinedAt: Date.now(),
-        };
+        const allPlayersPrev = await PlayerRedisService.getAllPlayers(roomId);
+        const existingPlayer = allPlayersPrev.find((p) => p.username === effectiveUsername);
 
-        await PlayerRedisService.addPlayer(roomId, player);
+        let player: Player;
+        if (existingPlayer) {
+          await PlayerRedisService.removePlayer(roomId, existingPlayer.id);
+          player = { ...existingPlayer, id: socket.id };
+          await PlayerRedisService.addPlayer(roomId, player);
+        } else {
+          player = {
+            id: socket.id,
+            username: effectiveUsername,
+            avatar: effectiveAvatar,
+            score: 0,
+            currentQuestionIndex: 0,
+            answers: [],
+            isReady: false,
+            joinedAt: Date.now(),
+          };
+          await PlayerRedisService.addPlayer(roomId, player);
+        }
+
         socket.join(roomId);
 
         let teamAssignments = await TeamRedisService.getTeamAssignments(roomId);

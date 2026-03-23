@@ -9,6 +9,10 @@ export function getSocket(): Socket {
     socket = io(url, {
       autoConnect: false,
       withCredentials: true,
+      auth: (cb) => {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        cb({ token });
+      },
     });
   }
   return socket;
