@@ -6,7 +6,7 @@ export class QuizService {
   static async generateAndSaveAIQuiz(topic: string, difficulty: string, count: number) {
     const generatedData = await generateQuizFromAI(topic, difficulty, count);
 
-    const mappedQuestions = generatedData.questions.map((q: AIQuestion) => ({
+    const mappedQuestions = (generatedData.questions as AIQuestion[]).map((q: AIQuestion) => ({
       questionText: q.question,
       options: q.options,
       correctAnswer: q.answer,
