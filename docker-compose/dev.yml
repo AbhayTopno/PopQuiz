@@ -51,8 +51,8 @@ services:
     env_file:
       - .env.langchain
     volumes:
-      - ../langchain:/usr/src/app:cached # Mount app code for hot reload
-      - /usr/src/app/.venv # Prevent Windows host .venv from overwriting Linux container .venv
+      - ../langchain:/usr/src/app:cached
+      - /usr/src/app/.venv
     networks:
       - myapp-network
     restart: unless-stopped

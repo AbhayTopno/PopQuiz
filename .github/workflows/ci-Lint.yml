@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -61,6 +61,7 @@ jobs:
         run: |
           cp docker-compose/.env.example.frontend.development docker-compose/.env.frontend
           cp docker-compose/.env.example.backend.development docker-compose/.env.backend
+          cp docker-compose/.env.example.langchain docker-compose/.env.langchain
       - name: Lint Dockerfiles with Hadolint
         run: |
           docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 frontend/docker/Dockerfile.dev
@@ -70,7 +71,7 @@ jobs:
       - name: Install yamllint
         run: pip install yamllint
       - name: Lint Docker Compose YAML files
-        run: yamllint docker-compose/
+        run: yamllint docker-compose/*.yml
       - name: Validate Docker Compose configurations
         run: |
           cd docker-compose
