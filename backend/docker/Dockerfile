@@ -12,17 +12,18 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 # This will now correctly generate the /dist folder
-RUN pnpm run build
-# Keep only production dependencies so runtime image does not need pnpm/npm.
-RUN pnpm prune --prod
+RUN pnpm run build && \
+	# Keep only production dependencies so runtime image does not need pnpm/npm.
+	pnpm prune --prod
 
 # -------------------------
 # Production Runtime
 # -------------------------
 FROM node:22-alpine AS production
 WORKDIR /usr/src/app
-RUN apk upgrade --no-cache && apk add --no-cache ca-certificates
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+RUN apk upgrade --no-cache && \
+	apk add --no-cache ca-certificates && \
+	rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 ENV NODE_ENV=production
 
