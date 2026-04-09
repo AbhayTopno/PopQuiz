@@ -1,8 +1,11 @@
 # ─── Stage 1: Builder ─────────────────────────────────────────────────────────
 FROM python:3.12-slim AS builder
 
+# Patch OS-level vulnerabilities
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 # Install uv (fast Python package manager)
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.6.4
 
 WORKDIR /app
 
@@ -15,6 +18,9 @@ RUN uv venv .venv && \
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
 FROM python:3.12-slim AS runtime
+
+# Patch OS-level vulnerabilities found by Trivy
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
