@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import {
   generateAndSaveQuiz,
   createQuiz,
@@ -11,7 +12,12 @@ import { apiLimiter } from '../middlewares/rateLimiter.js';
 
 const router = express.Router();
 
-router.post('/generate', apiLimiter, generateAndSaveQuiz);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+router.post('/generate', apiLimiter, upload.single('file'), generateAndSaveQuiz);
 
 // Manually create a quiz — admin only
 router.route('/').post(apiLimiter, protect, admin, createQuiz);

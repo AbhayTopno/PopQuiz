@@ -4,6 +4,7 @@ Follows SRP: this class decides WHICH chain to invoke; chains handle HOW.
 Follows DIP: depends on ILLMProvider and IEmbedder, not on concrete providers.
 """
 
+from app.chains.image_chain import ImageChain
 from app.chains.rag_chain import RAGChain
 from app.chains.topic_chain import TopicChain
 from app.interfaces.embedder import IEmbedder
@@ -17,6 +18,7 @@ class QuizService:
     def __init__(self, llm_provider: ILLMProvider, embedder: IEmbedder) -> None:
         self._topic_chain = TopicChain(llm_provider)
         self._rag_chain = RAGChain(llm_provider, embedder)
+        self._image_chain = ImageChain(llm_provider)
 
     async def generate_from_topic(
         self, topic: str, difficulty: str, count: int
@@ -31,9 +33,22 @@ class QuizService:
         filename: str,
         difficulty: str,
         count: int,
+        topic: str | None = None,
     ) -> QuizResponse:
         """Generate a RAG-grounded quiz from an uploaded document."""
-        raw = await self._rag_chain.run(file_bytes, filename, difficulty, count)
+        raw = await self._rag_chain.run(file_bytes, filename, difficulty, count, topic)
+        return self._to_response(raw)
+
+    async def generate_from_image(
+        self,
+        file_bytes: bytes,
+        mime_type: str,
+        difficulty: str,
+        count: int,
+        topic: str | None = None,
+    ) -> QuizResponse:
+        """Generate a quiz from an uploaded image using the multimodal model."""
+        raw = await self._image_chain.run(file_bytes, mime_type, difficulty, count, topic)
         return self._to_response(raw)
 
     # ── Private ────────────────────────────────────────────────────────────────
