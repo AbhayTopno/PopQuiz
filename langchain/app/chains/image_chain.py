@@ -1,6 +1,5 @@
 """
 Image-based quiz generation chain.
-Follows SRP: ONLY handles image-to-quiz generation with the multimodal LLM.
 """
 
 import base64

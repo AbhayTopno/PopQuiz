@@ -1,6 +1,5 @@
 """
 Topic-based quiz generation chain.
-Follows SRP: ONLY builds and invokes the topic-quiz LangChain chain.
 """
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -69,8 +68,6 @@ class TopicChain:
         )
 
         raw_text: str = (
-            response.content
-            if hasattr(response, "content")
-            else str(response)
+            response.content if hasattr(response, "content") else str(response)
         )
         return extract_quiz_json(raw_text)

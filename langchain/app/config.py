@@ -1,6 +1,5 @@
 """
 Application configuration — single source of truth for all environment variables.
-Follows SRP: this module ONLY reads and validates env vars.
 """
 
 from pydantic import computed_field
@@ -30,6 +29,7 @@ class Settings(BaseSettings):
         v = self.allowed_origins_str.strip()
         if v.startswith("["):
             import json
+
             return json.loads(v)
         return [o.strip() for o in v.split(",") if o.strip()]
 

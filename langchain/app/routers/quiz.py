@@ -1,6 +1,5 @@
 """
 Quiz HTTP router — thin layer between FastAPI and QuizService.
-Follows SRP: ONLY handles HTTP concerns (request parsing, response serialization, error mapping).
 
 Service is accessed via request.app.state so the router can be registered at
 creation time (not deferred to startup), which is required for FastAPI to compile
@@ -71,7 +70,9 @@ async def generate_from_topic(
             body.topic, body.difficulty, body.count
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -87,7 +88,9 @@ async def generate_from_topic(
 )
 async def generate_from_document(
     request: Request,
-    file: UploadFile = File(..., description="PDF/DOCX document or PNG/JPEG/WEBP image"),
+    file: UploadFile = File(
+        ..., description="PDF/DOCX document or PNG/JPEG/WEBP image"
+    ),
     difficulty: str = Form(default="medium", pattern="^(easy|medium|hard)$"),
     count: int = Form(default=5, ge=1, le=20),
     topic: str | None = Form(default=None, max_length=200),
@@ -120,7 +123,9 @@ async def generate_from_document(
             file_bytes, filename, difficulty, count, topic
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

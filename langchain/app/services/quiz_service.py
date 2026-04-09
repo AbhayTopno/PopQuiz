@@ -1,7 +1,5 @@
 """
 QuizService — orchestrates the two chain types.
-Follows SRP: this class decides WHICH chain to invoke; chains handle HOW.
-Follows DIP: depends on ILLMProvider and IEmbedder, not on concrete providers.
 """
 
 from app.chains.image_chain import ImageChain
@@ -48,7 +46,9 @@ class QuizService:
         topic: str | None = None,
     ) -> QuizResponse:
         """Generate a quiz from an uploaded image using the multimodal model."""
-        raw = await self._image_chain.run(file_bytes, mime_type, difficulty, count, topic)
+        raw = await self._image_chain.run(
+            file_bytes, mime_type, difficulty, count, topic
+        )
         return self._to_response(raw)
 
     # ── Private ────────────────────────────────────────────────────────────────

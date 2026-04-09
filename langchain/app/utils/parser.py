@@ -1,6 +1,5 @@
 """
 Structured output parser utilities.
-Follows SRP: ONLY responsible for extracting and validating quiz JSON from LLM text.
 """
 
 import json
