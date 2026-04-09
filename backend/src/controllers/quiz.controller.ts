@@ -2,15 +2,53 @@ import { asyncHandler } from '../middlewares/asyncHandler.js';
 import { QuizService } from '../services/quiz.service.js';
 import type { Request, Response } from 'express';
 
-const generateAndSaveQuiz = asyncHandler(async (req: Request, res: Response) => {
-  const { topic, difficulty, count } = req.body;
+const VALID_DIFFICULTIES = new Set(['easy', 'medium', 'hard']);
+const MAX_QUESTION_COUNT = 50;
+const MIN_QUESTION_COUNT = 1;
 
-  if (!topic || !difficulty || !count) {
+const parseCount = (value: unknown) => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value);
+  return Number.NaN;
+};
+
+const generateAndSaveQuiz = asyncHandler(async (req: Request, res: Response) => {
+  const difficulty = typeof req.body?.difficulty === 'string' ? req.body.difficulty : '';
+  const count = parseCount(req.body?.count);
+  const topic = typeof req.body?.topic === 'string' ? req.body.topic : '';
+
+  if (!difficulty || !VALID_DIFFICULTIES.has(difficulty)) {
     res.status(400);
-    throw new Error('Please provide topic, difficulty, and count');
+    throw new Error('Please provide a valid difficulty: easy, medium, or hard.');
+  }
+
+  if (!Number.isInteger(count) || count < MIN_QUESTION_COUNT || count > MAX_QUESTION_COUNT) {
+    res.status(400);
+    throw new Error(
+      `Count must be an integer between ${MIN_QUESTION_COUNT} and ${MAX_QUESTION_COUNT}.`,
+    );
   }
 
   try {
+    if (req.file) {
+      const savedQuiz = await QuizService.generateAndSaveAIQuizFromFile({
+        fileBuffer: req.file.buffer,
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        difficulty,
+        count,
+        topic,
+      });
+
+      res.status(201).json({ quizId: savedQuiz._id, savedQuiz });
+      return;
+    }
+
+    if (!topic.trim()) {
+      res.status(400);
+      throw new Error('Please provide a topic for text-based quiz generation.');
+    }
+
     const savedQuiz = await QuizService.generateAndSaveAIQuiz(topic, difficulty, count);
     res.status(201).json({ quizId: savedQuiz._id, savedQuiz });
   } catch (error: unknown) {

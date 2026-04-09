@@ -4,7 +4,7 @@ Follows SRP: each method handles exactly one stage of the RAG pipeline.
 Follows DIP: depends on ILLMProvider and IEmbedder abstractions.
 """
 
-import io
+import re
 import tempfile
 from pathlib import Path
 
@@ -22,8 +22,18 @@ _RAG_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """You are a professional quiz master. Use ONLY the following context extracted
-from a document to create a quiz. Do NOT use outside knowledge.
+                """You are a professional quiz master.
+
+Rules:
+1) If material_status is "present", use ONLY the provided document context as syllabus.
+    Do NOT use outside knowledge.
+2) If topic_hint is provided and material_status is "present", prioritize content relevant
+    to topic_hint, but still stay strictly within the context.
+3) If material_status is "missing", the uploaded material has no readable text.
+    In that case, generate a random general-knowledge quiz.
+
+Material status: {material_status}
+Topic hint: {topic_hint}
 
 Context:
 {context}
@@ -92,19 +102,68 @@ class RAGChain:
 
     # ── Stage 4: Retrieve ──────────────────────────────────────────────────────
 
-    def _retrieve(self, vectorstore: Chroma, k: int = 4) -> list[Document]:
+    def _retrieve(self, vectorstore: Chroma, query: str, k: int = 4) -> list[Document]:
         retriever = vectorstore.as_retriever(search_kwargs={"k": k})
-        return retriever.invoke("quiz questions based on document content")
+        return retriever.invoke(query)
+
+    def _retrieve_lexical(self, chunks: list[Document], query: str, k: int = 4) -> list[Document]:
+        """
+        Fallback retrieval when embedding models are unavailable.
+        Uses lightweight token overlap scoring.
+        """
+        query_tokens = {t for t in re.findall(r"[a-zA-Z0-9]+", query.lower()) if len(t) > 2}
+
+        scored: list[tuple[int, int, Document]] = []
+        for index, doc in enumerate(chunks):
+            text = (doc.page_content or "").lower()
+            if not text.strip():
+                continue
+
+            if not query_tokens:
+                score = 0
+            else:
+                score = sum(1 for token in query_tokens if token in text)
+
+            scored.append((score, -index, doc))
+
+        if not scored:
+            return []
+
+        scored.sort(reverse=True)
+        top = [doc for _, _, doc in scored[:k]]
+        return top or chunks[:k]
+
+    @staticmethod
+    def _build_query(topic: str | None) -> str:
+        hint = (topic or "").strip()
+        if hint:
+            return f"quiz questions about {hint} based strictly on document text"
+        return "quiz questions based strictly on document text"
+
+    @staticmethod
+    def _is_meaningful_text(value: str) -> bool:
+        cleaned = re.sub(r"\s+", " ", value).strip()
+        return len(cleaned) >= 40 and bool(re.search(r"[A-Za-z0-9]", cleaned))
 
     # ── Stage 5: Generate ──────────────────────────────────────────────────────
 
     async def _generate(
-        self, relevant_docs: list[Document], difficulty: str, count: int
+        self,
+        context: str,
+        difficulty: str,
+        count: int,
+        topic: str | None,
+        material_status: str,
     ) -> dict:
-        context = "\n\n".join(doc.page_content for doc in relevant_docs)
         chain = _RAG_PROMPT | self._llm
         response = await chain.ainvoke(
-            {"context": context, "difficulty": difficulty, "count": count}
+            {
+                "context": context,
+                "difficulty": difficulty,
+                "count": count,
+                "topic_hint": (topic or "").strip() or "none",
+                "material_status": material_status,
+            }
         )
         raw_text: str = (
             response.content if hasattr(response, "content") else str(response)
@@ -114,11 +173,44 @@ class RAGChain:
     # ── Public entry point ─────────────────────────────────────────────────────
 
     async def run(
-        self, file_bytes: bytes, filename: str, difficulty: str, count: int
+        self,
+        file_bytes: bytes,
+        filename: str,
+        difficulty: str,
+        count: int,
+        topic: str | None = None,
     ) -> dict:
         """Execute the full RAG pipeline and return structured quiz JSON."""
         docs = self._load_documents(file_bytes, filename)
         chunks = self._split(docs)
-        vectorstore = self._build_vectorstore(chunks)
-        relevant = self._retrieve(vectorstore)
-        return await self._generate(relevant, difficulty, count)
+        query = self._build_query(topic)
+
+        if not chunks:
+            return await self._generate(
+                context="",
+                difficulty=difficulty,
+                count=count,
+                topic=topic,
+                material_status="missing",
+            )
+
+        relevant: list[Document]
+        try:
+            vectorstore = self._build_vectorstore(chunks)
+            relevant = self._retrieve(vectorstore, query)
+        except Exception:
+            relevant = self._retrieve_lexical(chunks, query)
+
+        context = "\n\n".join(doc.page_content for doc in relevant if doc.page_content)
+        if not context.strip():
+            context = "\n\n".join(doc.page_content for doc in chunks[:4] if doc.page_content)
+
+        material_status = "present" if self._is_meaningful_text(context) else "missing"
+
+        return await self._generate(
+            context=context,
+            difficulty=difficulty,
+            count=count,
+            topic=topic,
+            material_status=material_status,
+        )

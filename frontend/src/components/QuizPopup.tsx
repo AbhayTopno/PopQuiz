@@ -16,6 +16,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement | null>(null);
   const customTeamRef = useRef<HTMLDivElement | null>(null);
+  const sourceInputRef = useRef<HTMLInputElement | null>(null);
 
   const [quizTopic, setQuizTopic] = useState('');
   const [difficulty, setDifficulty] = useState('easy');
@@ -24,6 +25,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
   const [duration, setDuration] = useState<number | ''>(10);
   const [customTeamA, setCustomTeamA] = useState(1);
   const [customTeamB, setCustomTeamB] = useState(1);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +37,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
   useEffect(() => {
     if (open && topic) {
       setQuizTopic(topic.toLowerCase());
+      setSourceFile(null);
     }
   }, [topic, open]);
 
@@ -42,6 +45,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
   useEffect(() => {
     if (open) {
       setError(null);
+      setSourceFile(null);
       gsap.fromTo(
         overlayRef.current,
         { opacity: 0 },
@@ -100,9 +104,53 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
     }
   };
 
-  const handleStart = async () => {
+  const handlePickSource = () => {
+    sourceInputRef.current?.click();
+  };
+
+  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+    ]);
+
+    if (!allowedTypes.has(file.type)) {
+      setError('Only PDF, DOC/DOCX, PNG, JPEG, or WEBP files are supported.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size must be 10MB or less.');
+      e.target.value = '';
+      return;
+    }
+
+    setSourceFile(file);
+    setError(null);
+
     if (!quizTopic.trim()) {
-      setError('Please provide a quiz topic');
+      setQuizTopic(file.name.replace(/\.[^/.]+$/, ''));
+    }
+
+    e.target.value = '';
+  };
+
+  const handleStart = async () => {
+    const trimmedTopic = quizTopic.trim();
+    const routingTopic =
+      trimmedTopic || sourceFile?.name.replace(/\.[^/.]+$/, '') || 'uploaded-source';
+
+    if (!trimmedTopic && !sourceFile) {
+      setError('Please provide a quiz topic or attach a source file.');
       return;
     }
 
@@ -117,22 +165,50 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
     setIsSubmitting(true);
     setError(null);
 
-    const data = {
-      topic: quizTopic.trim(),
-      difficulty,
-      count: finalQuestionCount,
-    };
-
     try {
-      const response = await fetch(`${getApiUrl()}/api/quiz/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+      let response: Response;
+
+      if (sourceFile) {
+        const formData = new FormData();
+        formData.append('file', sourceFile);
+        formData.append('difficulty', difficulty);
+        formData.append('count', String(finalQuestionCount));
+
+        if (trimmedTopic) {
+          formData.append('topic', trimmedTopic);
+        }
+
+        response = await fetch(`${getApiUrl()}/api/quiz/generate`, {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        response = await fetch(`${getApiUrl()}/api/quiz/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: trimmedTopic,
+            difficulty,
+            count: finalQuestionCount,
+          }),
+        });
+      }
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to generate quiz');
+        const contentType = response.headers.get('content-type') || '';
+        let message = 'Failed to generate quiz';
+
+        if (contentType.includes('application/json')) {
+          const errorData = (await response.json()) as { message?: string; detail?: string };
+          message = errorData.message || errorData.detail || message;
+        } else {
+          const errorText = await response.text();
+          if (errorText) {
+            message = errorText;
+          }
+        }
+
+        throw new Error(message);
       }
 
       const result = await response.json();
@@ -154,7 +230,7 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
             username,
             host: '1',
             mode: battleType,
-            topic: quizTopic.trim(),
+            topic: routingTopic,
             difficulty,
             count: String(finalQuestionCount),
             duration: String(finalDuration),
@@ -224,13 +300,44 @@ const QuizPopup: React.FC<QuizPopupProps> = ({ open, onClose, topic }) => {
             <label className="mb-1 sm:mb-2 block font-general text-xs sm:text-sm text-white/80">
               Quiz Topic
             </label>
-            <input
-              type="text"
-              value={quizTopic}
-              onChange={(e) => setQuizTopic(e.target.value)}
-              placeholder="Enter quiz topic..."
-              className={inputClass}
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={quizTopic}
+                onChange={(e) => setQuizTopic(e.target.value)}
+                placeholder="Enter quiz topic..."
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={handlePickSource}
+                className="h-10 w-10 sm:h-12 sm:w-12 shrink-0 rounded-lg border border-white/20 bg-white/10 text-lg sm:text-xl text-white transition-colors hover:bg-white/20"
+                title="Attach PDF, DOC/DOCX, or image"
+                aria-label="Attach quiz source file"
+              >
+                +
+              </button>
+              <input
+                ref={sourceInputRef}
+                type="file"
+                onChange={handleSourceChange}
+                className="hidden"
+                accept=".pdf,.doc,.docx,image/png,image/jpeg,image/webp"
+              />
+            </div>
+
+            {sourceFile && (
+              <div className="mt-2 flex items-center justify-between rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-xs sm:text-sm text-blue-100">
+                <span className="truncate pr-2">Source: {sourceFile.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setSourceFile(null)}
+                  className="rounded px-2 py-1 text-red-600 transition-colors hover:bg-blue-400/20 hover:text-white"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Difficulty */}

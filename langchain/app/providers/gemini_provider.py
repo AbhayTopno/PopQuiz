@@ -35,9 +35,25 @@ class GeminiEmbedder(IEmbedder):
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
+    @staticmethod
+    def _resolve_embedding_model(model_name: str) -> str:
+        """Normalize known-invalid model names to a broadly supported fallback."""
+        normalized = model_name.strip()
+        fallback_model = "models/embedding-001"
+
+        alias_map = {
+            "text-embedding-004": fallback_model,
+            "models/text-embedding-004": fallback_model,
+            "gemini-embedding-001": fallback_model,
+            "models/gemini-embedding-001": fallback_model,
+        }
+
+        return alias_map.get(normalized, normalized or fallback_model)
+
     @lru_cache(maxsize=1)  # type: ignore[misc]
     def get_embeddings(self) -> GoogleGenerativeAIEmbeddings:
+        resolved_model = self._resolve_embedding_model(self._settings.gemini_embed_model)
         return GoogleGenerativeAIEmbeddings(
-            model=self._settings.gemini_embed_model,
+            model=resolved_model,
             google_api_key=self._settings.google_api_key,
         )

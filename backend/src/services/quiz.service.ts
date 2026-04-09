@@ -1,21 +1,62 @@
 import { Quiz } from '../models/quiz.js';
-import { generateQuiz as generateQuizFromAI } from './aiService.js';
+import { generateQuiz as generateQuizFromAI, generateQuizFromFile } from './aiService.js';
 import type { AIQuestion } from '../types/index.js';
 
 export class QuizService {
-  static async generateAndSaveAIQuiz(topic: string, difficulty: string, count: number) {
-    const generatedData = await generateQuizFromAI(topic, difficulty, count);
-
-    const mappedQuestions = (generatedData.questions as AIQuestion[]).map((q: AIQuestion) => ({
+  private static mapAIQuestions(questions: AIQuestion[]) {
+    return questions.map((q: AIQuestion) => ({
       questionText: q.question,
       options: q.options,
       correctAnswer: q.answer,
     }));
+  }
+
+  private static deriveTopicFromFilename(filename: string) {
+    const trimmed = filename.trim();
+    const withoutExtension = trimmed.replace(/\.[^/.]+$/, '');
+    return withoutExtension || 'Uploaded Source';
+  }
+
+  static async generateAndSaveAIQuiz(topic: string, difficulty: string, count: number) {
+    const generatedData = await generateQuizFromAI(topic, difficulty, count);
+    const mappedQuestions = this.mapAIQuestions(generatedData.questions as AIQuestion[]);
 
     const newQuiz = new Quiz({
       topic,
       difficulty,
       numberOfQuestions: count,
+      questions: mappedQuestions,
+      hostedBy: 'AI Generated',
+    });
+
+    return await newQuiz.save();
+  }
+
+  static async generateAndSaveAIQuizFromFile(params: {
+    fileBuffer: Buffer;
+    filename: string;
+    mimeType: string;
+    difficulty: string;
+    count: number;
+    topic?: string;
+  }) {
+    const generatedData = await generateQuizFromFile(
+      params.fileBuffer,
+      params.filename,
+      params.mimeType,
+      params.difficulty,
+      params.count,
+      params.topic,
+    );
+
+    const mappedQuestions = this.mapAIQuestions(generatedData.questions as AIQuestion[]);
+    const resolvedTopic =
+      params.topic?.trim() || QuizService.deriveTopicFromFilename(params.filename);
+
+    const newQuiz = new Quiz({
+      topic: resolvedTopic,
+      difficulty: params.difficulty,
+      numberOfQuestions: params.count,
       questions: mappedQuestions,
       hostedBy: 'AI Generated',
     });

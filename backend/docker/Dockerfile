@@ -12,21 +12,24 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 # This will now correctly generate the /dist folder
-RUN pnpm run build
+RUN pnpm run build && \
+	# Keep only production dependencies so runtime image does not need pnpm/npm.
+	pnpm prune --prod
 
 # -------------------------
 # Production Runtime
 # -------------------------
 FROM node:22-alpine AS production
 WORKDIR /usr/src/app
-RUN apk upgrade --no-cache && apk add --no-cache ca-certificates && npm install -g npm@11.11.1 pnpm@10.32.1
+RUN apk upgrade --no-cache && \
+	apk add --no-cache ca-certificates && \
+	rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 ENV NODE_ENV=production
 
-# Copy only what's needed for a clean prod install (excludes devDependencies like esbuild/tsx)
+# Copy only the runtime artifacts.
 COPY --from=builder /usr/src/app/package.json ./package.json
-COPY --from=builder /usr/src/app/pnpm-lock.yaml ./pnpm-lock.yaml
-RUN pnpm install --frozen-lockfile --prod && rm -rf /root/.local/share/pnpm /root/.npm /tmp/*
+COPY --from=builder /usr/src/app/node_modules ./node_modules
 
 # Copy compiled output
 COPY --from=builder /usr/src/app/dist ./dist
