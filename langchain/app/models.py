@@ -1,6 +1,5 @@
 """
 Pydantic request / response schemas.
-Follows SRP: this module ONLY defines data shapes — no business logic.
 
 All shapes are intentionally kept identical to the existing Express backend
 contract so quiz.service.ts requires zero changes.
@@ -27,7 +26,9 @@ class TopicQuizRequest(BaseModel):
 
 class QuizQuestion(BaseModel):
     question: str
-    options: list[str] = Field(..., description='["A: ...", "B: ...", "C: ...", "D: ..."]')
+    options: list[str] = Field(
+        ..., description='["A: ...", "B: ...", "C: ...", "D: ..."]'
+    )
     answer: str
 
 

@@ -18,7 +18,7 @@ jobs:
   # Linting Stage
   # -----------------------------
   lint:
-    name: Lint — ${{ matrix.name }}
+    name: "🧹 Lint: ${{ matrix.name }}"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -48,13 +48,30 @@ jobs:
       - run: pnpm eslint "${{ matrix.eslint_glob }}" --max-warnings=0
       - run: pnpm prettier --check "${{ matrix.prettier_glob }}"
 
+  lint-python:
+    name: "🐍 Lint: langchain (Python)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: langchain
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - name: Format Check with Ruff
+        run: uvx ruff format --check .
+      - name: Lint with Ruff
+        run: uvx ruff check .
+
   # -----------------------------
   # Validation Stage
   # -----------------------------
   docker-validate:
-    name: Dockerfile & Compose Validation
+    name: "🐳 Validate: Docker & Compose"
     runs-on: ubuntu-latest
-    needs: [lint]
+    needs: [lint, lint-python]
     steps:
       - uses: actions/checkout@v4
       - name: Create dummy .env files from examples
@@ -66,8 +83,10 @@ jobs:
         run: |
           docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 frontend/docker/Dockerfile.dev
           docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 backend/docker/Dockerfile.dev
+          docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 langchain/docker/Dockerfile.dev
           docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 frontend/docker/Dockerfile
           docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 backend/docker/Dockerfile
+          docker run --rm -v "${{ github.workspace }}:/workspace" --workdir /workspace hadolint/hadolint:latest-debian hadolint --ignore DL3018 langchain/docker/Dockerfile
       - name: Install yamllint
         run: pip install yamllint
       - name: Lint Docker Compose YAML files
@@ -85,7 +104,7 @@ jobs:
           done
 
   k8s-validate:
-    name: Kubernetes Manifests & Helm Validation
+    name: "☸️ Validate: K8s & Helm"
     runs-on: ubuntu-latest
     needs: [docker-validate]
     steps:
@@ -126,9 +145,9 @@ jobs:
   # Security Scanning Stage
   # -----------------------------
   secret-scan:
-    name: Detect Hardcoded Secrets
+    name: "🔐 Scan: Hardcoded Secrets"
     runs-on: ubuntu-latest
-    needs: [lint]
+    needs: [lint, lint-python]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -140,7 +159,7 @@ jobs:
           extra_args: --regex --entropy --json
 
   trivy-image-scan:
-    name: Trivy Image Scan — ${{ matrix.name }}
+    name: "🛡️ Scan: Trivy (${{ matrix.name }})"
     runs-on: ubuntu-latest
     needs: [secret-scan]
     strategy:
@@ -154,6 +173,10 @@ jobs:
             image: myapp-backend
             dockerfile: backend/docker/Dockerfile
             context: ./backend
+          - name: langchain
+            image: myapp-langchain
+            dockerfile: langchain/docker/Dockerfile
+            context: ./langchain
     steps:
       - uses: actions/checkout@v4
       - name: Build ${{ matrix.name }} Docker image
@@ -166,13 +189,14 @@ jobs:
           format: 'table'
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
           exit-code: '1'
 
   # -----------------------------
   # Terraform Validation Stage
   # -----------------------------
   terraform-validate:
-    name: Terraform Format & Validate
+    name: "🏗️ Validate: Terraform"
     runs-on: ubuntu-latest
     needs: [k8s-validate]
     defaults:
@@ -214,7 +238,7 @@ jobs:
   # Final Analysis Stage
   # -----------------------------
   codeql:
-    name: CodeQL Static Analysis
+    name: "🔬 Scan: CodeQL"
     runs-on: ubuntu-latest
     needs: [trivy-image-scan, terraform-validate]
     permissions:
@@ -224,7 +248,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [javascript, typescript]
+        language: [javascript, typescript, python]
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3

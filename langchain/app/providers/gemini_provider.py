@@ -1,7 +1,5 @@
 """
 Concrete Gemini implementation of ILLMProvider and IEmbedder.
-Follows LSP: substitutable wherever the abstract interfaces are expected.
-Follows SRP: handles ONLY the construction of Gemini objects.
 """
 
 from functools import lru_cache
@@ -52,7 +50,9 @@ class GeminiEmbedder(IEmbedder):
 
     @lru_cache(maxsize=1)  # type: ignore[misc]
     def get_embeddings(self) -> GoogleGenerativeAIEmbeddings:
-        resolved_model = self._resolve_embedding_model(self._settings.gemini_embed_model)
+        resolved_model = self._resolve_embedding_model(
+            self._settings.gemini_embed_model
+        )
         return GoogleGenerativeAIEmbeddings(
             model=resolved_model,
             google_api_key=self._settings.google_api_key,

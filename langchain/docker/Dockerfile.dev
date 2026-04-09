@@ -1,9 +1,12 @@
 FROM python:3.12-slim
 
+# Patch OS-level vulnerabilities found by Trivy
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/src/app
 
 # Install uv for fast package management (installed via pip to avoid ghcr.io timeouts)
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.6.4
 
 # Set env vars 
 ENV PYTHONUNBUFFERED=1 \

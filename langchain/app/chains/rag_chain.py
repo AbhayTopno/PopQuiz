@@ -1,7 +1,5 @@
 """
 RAG-based quiz generation chain.
-Follows SRP: each method handles exactly one stage of the RAG pipeline.
-Follows DIP: depends on ILLMProvider and IEmbedder abstractions.
 """
 
 import re
@@ -22,7 +20,7 @@ _RAG_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-                """You are a professional quiz master.
+            """You are a professional quiz master.
 
 Rules:
 1) If material_status is "present", use ONLY the provided document context as syllabus.
@@ -106,12 +104,16 @@ class RAGChain:
         retriever = vectorstore.as_retriever(search_kwargs={"k": k})
         return retriever.invoke(query)
 
-    def _retrieve_lexical(self, chunks: list[Document], query: str, k: int = 4) -> list[Document]:
+    def _retrieve_lexical(
+        self, chunks: list[Document], query: str, k: int = 4
+    ) -> list[Document]:
         """
         Fallback retrieval when embedding models are unavailable.
         Uses lightweight token overlap scoring.
         """
-        query_tokens = {t for t in re.findall(r"[a-zA-Z0-9]+", query.lower()) if len(t) > 2}
+        query_tokens = {
+            t for t in re.findall(r"[a-zA-Z0-9]+", query.lower()) if len(t) > 2
+        }
 
         scored: list[tuple[int, int, Document]] = []
         for index, doc in enumerate(chunks):
@@ -203,7 +205,9 @@ class RAGChain:
 
         context = "\n\n".join(doc.page_content for doc in relevant if doc.page_content)
         if not context.strip():
-            context = "\n\n".join(doc.page_content for doc in chunks[:4] if doc.page_content)
+            context = "\n\n".join(
+                doc.page_content for doc in chunks[:4] if doc.page_content
+            )
 
         material_status = "present" if self._is_meaningful_text(context) else "missing"
 
