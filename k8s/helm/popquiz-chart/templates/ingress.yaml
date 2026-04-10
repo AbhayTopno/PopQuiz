@@ -20,13 +20,13 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ .Values.backend.name }}-service
+                name: {{ .Values.backend.name }}
                 port:
                   number: 80
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ .Values.frontend.name }}-service
+                name: {{ .Values.frontend.name }}
                 port:
                   number: 80

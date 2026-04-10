@@ -2,7 +2,7 @@ namespace: popquiz
 
 backend:
   name: popquiz-backend
-  image: abhaytopno/popquiz-backend:v5
+  image: abhaytopno/popquiz-backend:v12
   port: 5000
   resources:
     requests:
@@ -13,13 +13,14 @@ backend:
       memory: '512Mi'
   secretName: backend-secrets
   env:
-    redisUrl: 'redis://redis:6379'
+    redisUrl: 'redis://popquiz-redis:6379'
     nodeEnv: 'production'
     nextApi: 'https://YOUR_CLUSTER_IP.nip.io'
+    langchainServiceUrl: 'http://popquiz-langchain'
 
 frontend:
   name: popquiz-frontend
-  image: abhaytopno/popquiz-frontend:v5
+  image: abhaytopno/popquiz-frontend:v12
   port: 3000
   resources:
     requests:
@@ -32,7 +33,47 @@ frontend:
     nodeEnv: 'production'
     apiUrl: 'https://YOUR_CLUSTER_IP.nip.io'
     socketUrl: 'https://YOUR_CLUSTER_IP.nip.io'
-    internalApiUrl: 'http://popquiz-backend-service'
+    internalApiUrl: 'http://popquiz-backend'
+
+langchain:
+  name: popquiz-langchain
+  image: abhaytopno/popquiz-langchain:v1
+  port: 8000
+  resources:
+    requests:
+      cpu: '100m'
+      memory: '256Mi'
+    limits:
+      cpu: '500m'
+      memory: '512Mi'
+  secretName: langchain-secrets
+
+qdrant:
+  name: popquiz-qdrant
+  image: qdrant/qdrant:v1.17.1
+  httpPort: 6333
+  grpcPort: 6334
+  resources:
+    requests:
+      cpu: '100m'
+      memory: '256Mi'
+    limits:
+      cpu: '500m'
+      memory: '1Gi'
+  storage: 5Gi
+
+redis:
+  name: popquiz-redis
+  image: redis:7-alpine
+  port: 6379
+  resources:
+    requests:
+      cpu: '50m'
+      memory: '64Mi'
+    limits:
+      cpu: '200m'
+      memory: '256Mi'
+  storage: 1Gi
 
 ingress:
   host: popquiz.local
