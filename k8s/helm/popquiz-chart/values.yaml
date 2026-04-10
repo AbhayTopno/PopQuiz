@@ -50,7 +50,7 @@ langchain:
 
 qdrant:
   name: popquiz-qdrant
-  image: qdrant/qdrant:latest
+  image: qdrant/qdrant:v1.17.1
   httpPort: 6333
   grpcPort: 6334
   resources:
