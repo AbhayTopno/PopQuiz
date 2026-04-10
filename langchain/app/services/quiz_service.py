@@ -13,7 +13,9 @@ from app.models import QuizQuestion, QuizResponse
 class QuizService:
     """High-level service that delegates to the appropriate chain."""
 
-    def __init__(self, llm_provider: ILLMProvider, vs_provider: IVectorStoreProvider) -> None:
+    def __init__(
+        self, llm_provider: ILLMProvider, vs_provider: IVectorStoreProvider
+    ) -> None:
         self._topic_chain = TopicChain(llm_provider)
         self._rag_chain = RAGChain(llm_provider, vs_provider)
         self._image_chain = ImageChain(llm_provider)

@@ -61,7 +61,9 @@ class RAGChain:
     Pipeline: Load → Split → Embed → Retrieve → Generate.
     """
 
-    def __init__(self, llm_provider: ILLMProvider, vs_provider: IVectorStoreProvider) -> None:
+    def __init__(
+        self, llm_provider: ILLMProvider, vs_provider: IVectorStoreProvider
+    ) -> None:
         self._llm = llm_provider.get_llm()
         self._vs_provider = vs_provider
 
@@ -100,7 +102,9 @@ class RAGChain:
 
     # ── Stage 4: Retrieve ──────────────────────────────────────────────────────
 
-    def _retrieve(self, vectorstore: VectorStore, query: str, k: int = 4) -> list[Document]:
+    def _retrieve(
+        self, vectorstore: VectorStore, query: str, k: int = 4
+    ) -> list[Document]:
         retriever = vectorstore.as_retriever(search_kwargs={"k": k})
         return retriever.invoke(query)
 
