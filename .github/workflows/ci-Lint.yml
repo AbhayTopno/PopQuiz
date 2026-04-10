@@ -156,7 +156,8 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: .
-          extra_args: --regex --entropy --json --since-commit=22c3190
+          base: 55f53f2
+          extra_args: --regex --entropy --json
 
   trivy-image-scan:
     name: "🛡️ Scan: Trivy (${{ matrix.name }})"
