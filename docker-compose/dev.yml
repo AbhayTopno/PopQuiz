@@ -9,8 +9,6 @@ services:
       - '5000:5000'
     env_file:
       - .env.backend
-    environment:
-      - LANGCHAIN_SERVICE_URL=http://langchain:8000
     volumes:
       - ../backend:/usr/src/app:cached # Mount backend source code
       - /usr/src/app/node_modules # Prevent overwriting node_modules
@@ -56,6 +54,20 @@ services:
     networks:
       - myapp-network
     restart: unless-stopped
+    depends_on:
+      - qdrant
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_dev
+    ports:
+      - '6333:6333'
+      - '6334:6334'
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - myapp-network
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -72,3 +84,6 @@ services:
 
 networks:
   myapp-network:
+
+volumes:
+  qdrant_data:

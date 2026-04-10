@@ -5,6 +5,6 @@ __pycache__
 .mypy_cache
 .ruff_cache
 .env
-chroma_db/
+qdrant_data/
 *.egg-info
 .venv

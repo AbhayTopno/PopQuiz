@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     gemini_model: str
     gemini_embed_model: str
 
-    # ── ChromaDB ─────────────────────────────────────────────────────────────
-    chroma_persist_dir: str
+    # ── Qdrant ────────────────────────────────────────────────────────────────
+    qdrant_url: str
 
     # ── FastAPI / CORS ────────────────────────────────────────────────────────
     # Stored as a plain string to avoid pydantic-settings trying to JSON-decode
