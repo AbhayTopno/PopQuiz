@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.providers.gemini_provider import GeminiEmbedder, GeminiProvider
+from app.providers.qdrant_provider import QdrantVectorStoreProvider
 from app.routers.quiz import router as quiz_router
 from app.services.quiz_service import QuizService
 
@@ -26,7 +27,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     llm_provider = GeminiProvider(settings)
     embedder = GeminiEmbedder(settings)
-    app.state.quiz_service = QuizService(llm_provider, embedder)
+    vs_provider = QdrantVectorStoreProvider(embedder, settings)
+    app.state.quiz_service = QuizService(llm_provider, vs_provider)
 
     yield  # app is serving
 

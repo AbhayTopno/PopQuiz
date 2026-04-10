@@ -106,7 +106,7 @@ docker compose -f docker-compose/dev.yml up --build
 | Concern | Recommendation |
 |---|---|
 | LLM model | Switch `GEMINI_MODEL` to `gemini-1.5-pro` for higher quality |
-| Vector store | Replace in-memory Chroma with persistent `PGVector` or `Pinecone` |
+| Vector store | Qdrant runs in Docker with persistent volume — consider auth and snapshots for production |
 | Auth | Add an API key header check in the router middleware |
 | Scaling | The service is stateless — scale horizontally behind a load balancer |
 | Observability | Add LangSmith tracing: set `LANGCHAIN_API_KEY` + `LANGCHAIN_TRACING_V2=true` |

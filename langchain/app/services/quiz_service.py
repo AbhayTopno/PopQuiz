@@ -5,17 +5,17 @@ QuizService — orchestrates the two chain types.
 from app.chains.image_chain import ImageChain
 from app.chains.rag_chain import RAGChain
 from app.chains.topic_chain import TopicChain
-from app.interfaces.embedder import IEmbedder
 from app.interfaces.llm_provider import ILLMProvider
+from app.interfaces.vectorstore import IVectorStoreProvider
 from app.models import QuizQuestion, QuizResponse
 
 
 class QuizService:
     """High-level service that delegates to the appropriate chain."""
 
-    def __init__(self, llm_provider: ILLMProvider, embedder: IEmbedder) -> None:
+    def __init__(self, llm_provider: ILLMProvider, vs_provider: IVectorStoreProvider) -> None:
         self._topic_chain = TopicChain(llm_provider)
-        self._rag_chain = RAGChain(llm_provider, embedder)
+        self._rag_chain = RAGChain(llm_provider, vs_provider)
         self._image_chain = ImageChain(llm_provider)
 
     async def generate_from_topic(

@@ -2,7 +2,7 @@
 services:
   backend:
     container_name: production_backend
-    image: abhaytopno/popquiz-backend:v10
+    image: abhaytopno/popquiz-backend:v12
     restart: unless-stopped
     env_file:
       - .env.backend
@@ -12,10 +12,11 @@ services:
       - popquiz-network
     depends_on:
       - redis
+      - langchain
 
   frontend:
     container_name: production_frontend
-    image: abhaytopno/popquiz-frontend:v10
+    image: abhaytopno/popquiz-frontend:v12
     restart: unless-stopped
     env_file:
       - .env.frontend
@@ -23,6 +24,31 @@ services:
       - '3000:3000'
     depends_on:
       - backend
+    networks:
+      - popquiz-network
+
+  langchain:
+    container_name: production_langchain
+    image: abhaytopno/popquiz-langchain:v1
+    restart: unless-stopped
+    env_file:
+      - .env.langchain
+    ports:
+      - '8000:8000'
+    networks:
+      - popquiz-network
+    depends_on:
+      - qdrant
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: production_qdrant
+    restart: unless-stopped
+    ports:
+      - '6333:6333'
+      - '6334:6334'
+    volumes:
+      - qdrant_data:/qdrant/storage
     networks:
       - popquiz-network
 
@@ -37,3 +63,6 @@ services:
 
 networks:
   popquiz-network:
+
+volumes:
+  qdrant_data:

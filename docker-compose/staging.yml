@@ -15,6 +15,7 @@ services:
       - myapp-network
     depends_on:
       - redis
+      - langchain
 
   frontend:
     build:
@@ -31,6 +32,33 @@ services:
     networks:
       - myapp-network
 
+  langchain:
+    build:
+      context: ../langchain
+      dockerfile: docker/Dockerfile
+    container_name: myapp_langchain_prod
+    restart: unless-stopped
+    env_file:
+      - .env.langchain
+    ports:
+      - '8000:8000'
+    networks:
+      - myapp-network
+    depends_on:
+      - qdrant
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: myapp_qdrant_prod
+    restart: unless-stopped
+    ports:
+      - '6333:6333'
+      - '6334:6334'
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - myapp-network
+
   redis:
     image: redis:7-alpine
     container_name: myapp_redis_prod
@@ -42,3 +70,6 @@ services:
 
 networks:
   myapp-network:
+
+volumes:
+  qdrant_data:

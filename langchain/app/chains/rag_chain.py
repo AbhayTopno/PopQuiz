@@ -8,12 +8,12 @@ from pathlib import Path
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.vectorstores import VectorStore
 
-from app.interfaces.embedder import IEmbedder
 from app.interfaces.llm_provider import ILLMProvider
+from app.interfaces.vectorstore import IVectorStoreProvider
 from app.utils.parser import extract_quiz_json
 
 _RAG_PROMPT = ChatPromptTemplate.from_messages(
@@ -61,9 +61,9 @@ class RAGChain:
     Pipeline: Load → Split → Embed → Retrieve → Generate.
     """
 
-    def __init__(self, llm_provider: ILLMProvider, embedder: IEmbedder) -> None:
+    def __init__(self, llm_provider: ILLMProvider, vs_provider: IVectorStoreProvider) -> None:
         self._llm = llm_provider.get_llm()
-        self._embeddings = embedder.get_embeddings()
+        self._vs_provider = vs_provider
 
     # ── Stage 1: Load ──────────────────────────────────────────────────────────
 
@@ -93,14 +93,14 @@ class RAGChain:
     def _split(self, documents: list[Document]) -> list[Document]:
         return _SPLITTER.split_documents(documents)
 
-    # ── Stage 3: Embed + Store (ephemeral, in-memory) ──────────────────────────
+    # ── Stage 3: Embed + Store (ephemeral Qdrant collection) ───────────────────
 
-    def _build_vectorstore(self, chunks: list[Document]) -> Chroma:
-        return Chroma.from_documents(chunks, embedding=self._embeddings)
+    def _build_vectorstore(self, chunks: list[Document]) -> VectorStore:
+        return self._vs_provider.build(chunks)
 
     # ── Stage 4: Retrieve ──────────────────────────────────────────────────────
 
-    def _retrieve(self, vectorstore: Chroma, query: str, k: int = 4) -> list[Document]:
+    def _retrieve(self, vectorstore: VectorStore, query: str, k: int = 4) -> list[Document]:
         retriever = vectorstore.as_retriever(search_kwargs={"k": k})
         return retriever.invoke(query)
 
@@ -197,11 +197,18 @@ class RAGChain:
             )
 
         relevant: list[Document]
+        vectorstore: VectorStore | None = None
         try:
             vectorstore = self._build_vectorstore(chunks)
             relevant = self._retrieve(vectorstore, query)
         except Exception:
             relevant = self._retrieve_lexical(chunks, query)
+        finally:
+            if vectorstore is not None:
+                try:
+                    self._vs_provider.cleanup(vectorstore)
+                except Exception:
+                    pass  # best-effort cleanup
 
         context = "\n\n".join(doc.page_content for doc in relevant if doc.page_content)
         if not context.strip():
