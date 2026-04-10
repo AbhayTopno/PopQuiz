@@ -1,19 +1,18 @@
-# deployment-canary.yml
-apiVersion: apps/v1
+﻿apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: redis
+  name: popquiz-redis
   namespace: popquiz
 spec:
-  serviceName: redis          # Must match the headless Redis Service name
+  serviceName: popquiz-redis
   replicas: 1
   selector:
     matchLabels:
-      app: redis
+      app: popquiz-redis
   template:
     metadata:
       labels:
-        app: redis
+        app: popquiz-redis
     spec:
       containers:
         - name: redis
@@ -43,27 +42,113 @@ spec:
         resources:
           requests:
             storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: popquiz-qdrant
+  namespace: popquiz
+spec:
+  serviceName: popquiz-qdrant
+  replicas: 1
+  selector:
+    matchLabels:
+      app: popquiz-qdrant
+  template:
+    metadata:
+      labels:
+        app: popquiz-qdrant
+    spec:
+      containers:
+        - name: qdrant
+          image: qdrant/qdrant:latest
+          ports:
+            - containerPort: 6333
+              name: http
+            - containerPort: 6334
+              name: grpc
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '500m'
+              memory: '1Gi'
+          volumeMounts:
+            - name: qdrant-data
+              mountPath: /qdrant/storage
+  volumeClaimTemplates:
+    - metadata:
+        name: qdrant-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: popquiz-backend-deployment-canary
+  name: popquiz-langchain-canary
   namespace: popquiz
   labels:
-    app: popquiz-backend-canary
+    app: popquiz-langchain
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: popquiz-backend-canary
+      app: popquiz-langchain
+      version: canary
   template:
     metadata:
       labels:
-        app: popquiz-backend-canary
+        app: popquiz-langchain
         version: canary
     spec:
       containers:
-        - name: popquiz-backend
+        - name: langchain
+          image: abhaytopno/popquiz-langchain:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: langchain-secrets
+          resources:
+            requests:
+              cpu: '100m'
+              memory: '256Mi'
+            limits:
+              cpu: '500m'
+              memory: '512Mi'
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: popquiz-backend-canary
+  namespace: popquiz
+  labels:
+    app: popquiz-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: popquiz-backend
+      version: canary
+  template:
+    metadata:
+      labels:
+        app: popquiz-backend
+        version: canary
+    spec:
+      containers:
+        - name: backend
           image: abhaytopno/popquiz-backend:v12
           imagePullPolicy: Always
           ports:
@@ -82,28 +167,30 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             readOnlyRootFilesystem: true
+
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: popquiz-frontend-deployment-canary
+  name: popquiz-frontend-canary
   namespace: popquiz
   labels:
-    app: popquiz-frontend-canary
+    app: popquiz-frontend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: popquiz-frontend-canary
+      app: popquiz-frontend
+      version: canary
   template:
     metadata:
       labels:
-        app: popquiz-frontend-canary
+        app: popquiz-frontend
         version: canary
     spec:
       containers:
-        - name: popquiz-frontend
-          image: abhaytopno/popquiz-frontend:v10
+        - name: frontend
+          image: abhaytopno/popquiz-frontend:v12
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -117,3 +204,4 @@ spec:
             limits:
               cpu: '500m'
               memory: '512Mi'
+

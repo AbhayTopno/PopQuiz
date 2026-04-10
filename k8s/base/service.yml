@@ -1,12 +1,12 @@
-apiVersion: v1
+﻿apiVersion: v1
 kind: Service
 metadata:
-  name: redis
+  name: popquiz-redis
   namespace: popquiz
 spec:
-  clusterIP: None       # Headless: required by the StatefulSet for stable pod DNS
+  clusterIP: None
   selector:
-    app: redis
+    app: popquiz-redis
   ports:
     - protocol: TCP
       port: 6379
@@ -16,7 +16,42 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: popquiz-backend-service
+  name: popquiz-qdrant
+  namespace: popquiz
+spec:
+  clusterIP: None
+  selector:
+    app: popquiz-qdrant
+  ports:
+    - name: http
+      protocol: TCP
+      port: 6333
+      targetPort: 6333
+    - name: grpc
+      protocol: TCP
+      port: 6334
+      targetPort: 6334
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-langchain
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-langchain
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-backend
   namespace: popquiz
 spec:
   selector:
@@ -31,7 +66,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: popquiz-frontend-service
+  name: popquiz-frontend
   namespace: popquiz
 spec:
   selector:

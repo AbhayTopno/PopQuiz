@@ -1,4 +1,4 @@
-apiVersion: autoscaling.k8s.io/v1
+﻿apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: popquiz-frontend-vpa
@@ -7,8 +7,7 @@ spec:
   targetRef:
     apiVersion: 'apps/v1'
     kind: Deployment
-    name: popquiz-frontend-deployment
-
+    name: popquiz-frontend
   updatePolicy:
     updateMode: 'Auto'
 
@@ -22,8 +21,7 @@ spec:
   targetRef:
     apiVersion: 'apps/v1'
     kind: Deployment
-    name: popquiz-backend-deployment
-
+    name: popquiz-backend
   updatePolicy:
     updateMode: 'Auto'
 
@@ -31,13 +29,40 @@ spec:
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  name: redis-vpa
+  name: popquiz-langchain-vpa
   namespace: popquiz
 spec:
   targetRef:
     apiVersion: 'apps/v1'
     kind: Deployment
-    name: redis
+    name: popquiz-langchain
+  updatePolicy:
+    updateMode: 'Auto'
 
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: popquiz-redis-vpa
+  namespace: popquiz
+spec:
+  targetRef:
+    apiVersion: 'apps/v1'
+    kind: StatefulSet
+    name: popquiz-redis
+  updatePolicy:
+    updateMode: 'Auto'
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: popquiz-qdrant-vpa
+  namespace: popquiz
+spec:
+  targetRef:
+    apiVersion: 'apps/v1'
+    kind: StatefulSet
+    name: popquiz-qdrant
   updatePolicy:
     updateMode: 'Auto'

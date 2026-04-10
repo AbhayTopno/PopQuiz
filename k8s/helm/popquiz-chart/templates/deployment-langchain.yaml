@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.langchain.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: {{ .Values.langchain.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.langchain.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.langchain.name }}
+    spec:
+      containers:
+        - name: {{ .Values.langchain.name }}
+          image: {{ .Values.langchain.image }}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.langchain.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.langchain.secretName }}
+          resources:
+            requests:
+              cpu: {{ .Values.langchain.resources.requests.cpu }}
+              memory: {{ .Values.langchain.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.langchain.resources.limits.cpu }}
+              memory: {{ .Values.langchain.resources.limits.memory }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000

@@ -1,4 +1,4 @@
-apiVersion: autoscaling/v2
+﻿apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: popquiz-frontend-hpa
@@ -7,7 +7,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: popquiz-frontend-deployment
+    name: popquiz-frontend
   minReplicas: 1
   maxReplicas: 5
   metrics:
@@ -28,7 +28,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: popquiz-backend-deployment
+    name: popquiz-backend
   minReplicas: 1
   maxReplicas: 5
   metrics:
@@ -43,13 +43,55 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: redis-hpa
+  name: popquiz-langchain-hpa
   namespace: popquiz
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
-    kind: StatefulSet       # Redis is now a StatefulSet
-    name: redis
+    kind: Deployment
+    name: popquiz-langchain
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: popquiz-redis-hpa
+  namespace: popquiz
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: popquiz-redis
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: popquiz-qdrant-hpa
+  namespace: popquiz
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: popquiz-qdrant
   minReplicas: 1
   maxReplicas: 3
   metrics:

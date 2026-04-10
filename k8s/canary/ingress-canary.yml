@@ -24,20 +24,20 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: popquiz-backend-service-canary
+                name: popquiz-backend-canary
                 port:
                   number: 80
           - path: /socket.io
             pathType: Prefix
             backend:
               service:
-                name: popquiz-backend-service-canary
+                name: popquiz-backend-canary
                 port:
                   number: 80
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: popquiz-frontend-service-canary
+                name: popquiz-frontend-canary
                 port:
                   number: 80

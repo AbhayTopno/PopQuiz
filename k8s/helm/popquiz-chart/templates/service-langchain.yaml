@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.frontend.name }}
+  name: {{ .Values.langchain.name }}
   namespace: {{ .Values.namespace }}
 spec:
   selector:
-    app: {{ .Values.frontend.name }}
+    app: {{ .Values.langchain.name }}
   ports:
     - protocol: TCP
       port: 80
-      targetPort: {{ .Values.frontend.port }}
+      targetPort: {{ .Values.langchain.port }}
   type: ClusterIP

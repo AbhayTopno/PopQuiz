@@ -1,24 +1,74 @@
-# service.yml
-apiVersion: v1
+﻿apiVersion: v1
 kind: Service
 metadata:
-  name: redis
+  name: popquiz-redis
   namespace: popquiz
 spec:
-  clusterIP: None       # Headless: required by the StatefulSet for stable pod DNS
+  clusterIP: None
   selector:
-    app: redis
+    app: popquiz-redis
   ports:
     - protocol: TCP
       port: 6379
       targetPort: 6379
 
 ---
-# --- Backend Services ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: popquiz-backend-service-stable
+  name: popquiz-qdrant
+  namespace: popquiz
+spec:
+  clusterIP: None
+  selector:
+    app: popquiz-qdrant
+  ports:
+    - name: http
+      protocol: TCP
+      port: 6333
+      targetPort: 6333
+    - name: grpc
+      protocol: TCP
+      port: 6334
+      targetPort: 6334
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-langchain-stable
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-langchain
+    version: stable
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-langchain-canary
+  namespace: popquiz
+spec:
+  selector:
+    app: popquiz-langchain
+    version: canary
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: popquiz-backend-stable
   namespace: popquiz
 spec:
   selector:
@@ -29,15 +79,16 @@ spec:
       port: 80
       targetPort: 5000
   type: ClusterIP
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: popquiz-backend-service-canary
+  name: popquiz-backend-canary
   namespace: popquiz
 spec:
   selector:
-    app: popquiz-backend-canary
+    app: popquiz-backend
     version: canary
   ports:
     - protocol: TCP
@@ -46,11 +97,10 @@ spec:
   type: ClusterIP
 
 ---
-# --- Frontend Services ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: popquiz-frontend-service-stable
+  name: popquiz-frontend-stable
   namespace: popquiz
 spec:
   selector:
@@ -61,15 +111,16 @@ spec:
       port: 80
       targetPort: 3000
   type: ClusterIP
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: popquiz-frontend-service-canary
+  name: popquiz-frontend-canary
   namespace: popquiz
 spec:
   selector:
-    app: popquiz-frontend-canary
+    app: popquiz-frontend
     version: canary
   ports:
     - protocol: TCP

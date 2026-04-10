@@ -7,14 +7,44 @@ Welcome! This repository serves as a practical guide and a collection of manifes
 
 ---
 
+## 🏗️ Architecture Overview
+
+PopQuiz is a 5-service application. Understanding what each service does will help you follow the rest of this guide.
+
+```
+┌──────────────┐     ┌──────────────────┐     ┌───────────┐
+│   Frontend   │────▶│     Backend      │───▶│   Redis   │
+│  (Next.js)   │     │   (Express.js)   │     │  (Cache)  │
+│  Port: 3000  │     │   Port: 5000     │     │ Port: 6379│
+└──────────────┘     └───────┬──────────┘     └───────────┘
+                             │
+                             ▼
+                     ┌──────────────────┐     ┌───────────┐
+                     │    Langchain     │────▶│  Qdrant   │
+                     │    (FastAPI)     │     │ (VectorDB)│
+                     │   Port: 8000     │     │ Port: 6333│
+                     └──────────────────┘     └───────────┘
+```
+
+| Service | What It Does | Exposed? |
+|---------|-------------|----------|
+| **Frontend** | Next.js app — the user interface | Yes (via Ingress) |
+| **Backend** | Express.js API — handles auth, quizzes, WebSockets | Yes (via Ingress at `/api` and `/socket.io`) |
+| **Langchain** | FastAPI AI service — generates quizzes using Gemini + RAG | No (internal only, backend calls it) |
+| **Qdrant** | Vector database — stores document embeddings for RAG | No (internal only, langchain calls it) |
+| **Redis** | In-memory cache — stores game room state | No (internal only, backend calls it) |
+
+---
+
 ## ✨ Features
 
 This project provides hands-on examples for the following deployment strategies:
 
-- **Base Deployment**: A standard, straightforward deployment.
-- **Autoscaling**: Automatically scale your application based on resource utilization.
+- **Base Deployment**: A standard, straightforward deployment of all 5 services.
+- **Autoscaling**: Automatically scale your application based on resource utilization (HPA + VPA).
 - **Blue-Green Deployment**: Achieve zero-downtime releases by switching traffic between two identical environments.
 - **Canary Deployment**: Gradually roll out new versions to a small subset of users to minimize risk.
+- **Helm Chart**: Package and deploy the entire stack with a single command using Helm.
 - **Monitoring**: Set up a complete monitoring stack using Prometheus and Grafana.
 
 ---
@@ -23,264 +53,487 @@ This project provides hands-on examples for the following deployment strategies:
 
 Before you begin, ensure you have the following tools installed and configured:
 
-- **kubectl**: The Kubernetes command-line tool.
-- **A Kubernetes Cluster**: A running cluster, such as [Minikube](https://minikube.sigs.k8s.io/docs/start/), [Docker Desktop](https://www.docker.com/products/docker-desktop/), or a cloud-based cluster (GKE, EKS, AKS).
-- **An Ingress Controller**: Required for Blue-Green and Canary strategies. If you don't have one, we recommend the [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/deploy/).
+- **kubectl**: The Kubernetes command-line tool. ([Install Guide](https://kubernetes.io/docs/tasks/tools/))
+- **A Kubernetes Cluster**: A running cluster. See the setup guides for your environment:
+  - **Local:** [Kind](KIND.md) (lightweight, Docker-based) · [Minikube](MINIKUBE.md) (feature-rich, built-in addons)
+  - **Cloud:** [GKE](GKE.md) (Google Kubernetes Engine) · EKS · AKS
+- **An Ingress Controller**: Required for routing external traffic. We recommend the [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/deploy/).
 - **Git**: For cloning the repository.
-- **Helm**: The package manager for Kubernetes, used to install the monitoring stack.
+- **Helm** _(optional)_: The package manager for Kubernetes — only needed for the Helm deployment and monitoring stack.
+
+> **💡 New to Kubernetes?** Set up a local cluster first with [Kind](KIND.md) or [Minikube](MINIKUBE.md), then start with the [Base Deployment](#base-deployment) strategy. It's the simplest and will help you understand how the pieces fit together before moving to advanced strategies.
 
 ---
 
 ## 🚀 Getting Started
 
-Follow these initial setup steps before trying any of the deployment strategies.
+Follow these steps **once** before trying any deployment strategy. They set up the namespace, ingress controller, and secrets that every strategy needs.
 
-1.  **Clone the Repository**
+### Step 1 — Clone the Repository
 
-    ```bash
-    git clone [https://github.com/your-username/popquiz.git](https://github.com/your-username/popquiz.git)
-    cd my-k8s-project
-    ```
+```bash
+git clone https://github.com/AbhayTopno/popquiz.git
+cd Popquiz/k8s
+```
 
-2.  **Create the Namespace**
-    All resources will be deployed in a dedicated `popquiz` namespace to keep them isolated.
+### Step 2 — Create the Namespace
 
-    ```bash
-    kubectl create namespace popquiz
-    ```
+All resources live in a dedicated `popquiz` namespace to keep them isolated from other workloads.
 
-3.  **Deploy the Ingress Controller**
-    Before you can expose your application via Ingress, you need an Ingress Controller — a component that watches Ingress resources and routes external traffic to your services.
+```bash
+kubectl create namespace popquiz
+```
 
-    ```bash
-    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
-    ```
+> **What is a namespace?** Think of it like a folder — it groups related resources together and prevents naming conflicts.
 
-    ⏳ Note:
+### Step 3 — Deploy the Ingress Controller
 
-    - It can take a few minutes for the NGINX controller pods and service to become active.
-    - You can check the status using:
+The Ingress Controller is a special Kubernetes component that listens for Ingress resources and routes external HTTP traffic to your services.
 
-    ```bash
-    kubectl get pods -n ingress-nginx
-    kubectl get svc -n ingress-nginx
-    ```
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+```
 
-4.  **Create Application Configuration**
-    Create the necessary Kubernetes Secrets and ConfigMaps from your local `.env` files.
+Wait for it to be ready (this can take 1-2 minutes):
 
-    ```bash
-    # Create secrets for the backend (e.g., database credentials)
-    kubectl create secret generic backend-secrets --namespace popquiz --from-env-file=.env.backend
-    # Create a configmap for the frontend (e.g., API URLs)
-    kubectl create configmap frontend-secrets --namespace popquiz --from-env-file=.env.frontend
-    ```
+```bash
+kubectl get pods -n ingress-nginx -w
+# Wait until STATUS shows "Running" for the controller pod, then press Ctrl+C
+```
+
+### Step 4 — Create Your Environment Files
+
+Copy the example files and fill in your actual values:
+
+```bash
+cp .env.example.backend .env.backend
+cp .env.example.frontend .env.frontend
+cp .env.example.langchain .env.langchain
+```
+
+Now edit each file with your real credentials:
+
+| File | Key Variables to Set |
+|------|---------------------|
+| `.env.backend` | `MONGO_URI`, `JWT_SECRET`, `GROQ_API_KEY`, `CORS_ORIGIN`, `COOKIE_DOMAIN` |
+| `.env.frontend` | `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SOCKET_URL` (set to your cluster IP) |
+| `.env.langchain` | `GOOGLE_API_KEY` (your Gemini API key) |
+
+> **⚠️ Security:** Never commit `.env.backend`, `.env.frontend`, or `.env.langchain` to Git. They are already in `.gitignore`.
+
+### Step 5 — Create Kubernetes Secrets and ConfigMaps
+
+Kubernetes stores sensitive data in **Secrets** (encrypted) and non-sensitive config in **ConfigMaps**.
+
+```bash
+# Backend secrets (database credentials, API keys, etc.)
+kubectl create secret generic backend-secrets \
+  --from-env-file=.env.backend \
+  --namespace=popquiz
+
+# Frontend config (public URLs — not sensitive)
+kubectl create configmap frontend-secrets \
+  --from-env-file=.env.frontend \
+  --namespace=popquiz
+
+# Langchain secrets (Gemini API key, Qdrant config)
+kubectl create secret generic langchain-secrets \
+  --from-env-file=.env.langchain \
+  --namespace=popquiz
+```
+
+**Verify they were created:**
+
+```bash
+kubectl get secrets,configmaps -n popquiz
+```
+
+You should see `backend-secrets`, `frontend-secrets`, and `langchain-secrets` in the output.
+
+### Step 6 — Set Your Cluster IP
+
+The ingress manifests use `YOUR_CLUSTER_IP.nip.io` as a placeholder. Before applying any ingress file, replace it with your actual cluster IP:
+
+```bash
+# Find your cluster IP
+minikube ip          # For Minikube
+kubectl get nodes -o wide  # For cloud clusters — use the EXTERNAL-IP
+```
+
+Then do a find-and-replace in the ingress files:
+
+```bash
+# Linux / macOS
+sed -i 's/YOUR_CLUSTER_IP/192.168.58.2/g' base/ingress.yml
+sed -i 's/YOUR_CLUSTER_IP/192.168.58.2/g' blue-green/ingress.yml
+sed -i 's/YOUR_CLUSTER_IP/192.168.58.2/g' canary/ingress-stable.yml
+sed -i 's/YOUR_CLUSTER_IP/192.168.58.2/g' canary/ingress-canary.yml
+```
+
+Also update your `.env.backend` and `.env.frontend` files with the same IP for `CORS_ORIGIN`, `COOKIE_DOMAIN`, `NEXT_PUBLIC_API_URL`, etc.
+
+> **💡 Tip:** On Windows, use your IDE's find-and-replace across files, or PowerShell:
+> ```powershell
+> Get-ChildItem -Recurse -Filter *.yml | ForEach-Object {
+>   (Get-Content $_.FullName) -replace 'YOUR_CLUSTER_IP','192.168.58.2' | Set-Content $_.FullName
+> }
+> ```
 
 ---
 
 ## Deployment Strategies
 
-Choose a strategy below and follow the instructions.
+Choose **one** strategy below and follow its instructions. Each strategy deploys the same 5 services — they just differ in how updates are rolled out.
 
-### Helm Chart Deployment 🚢
+> **🔰 Recommended for beginners:** Start with [Base Deployment](#base-deployment), then try [Autoscaling](#autoscaling-deployment).
 
-Package and deploy the application using the provided Helm chart for better versioning and release management.
-
-1.  **Navigate to the Helm directory:**
-
-    ```bash
-    cd k8s/helm
-    ```
-
-2.  **Package the chart:**
-
-    This command bundles your chart into a versioned archive file (`.tgz`).
-
-    ```bash
-    helm package popquiz-chart
-    ```
-
-    This will create a file named something like `popquiz-chart-0.1.0.tgz`.
-
-3.  **Install the chart:**
-
-    Deploy the packaged chart into your Kubernetes cluster.
-
-    ```bash
-    helm install popquiz-release ./popquiz-chart-0.1.0.tgz --namespace popquiz --create-namespace
-    ```
+---
 
 ### Base Deployment
 
-This is the most basic way to run the application with a single Deployment and Service.
+The simplest strategy — one replica of each service with a straightforward rollout.
 
-1.  **Navigate to the directory:**
-    ```bash
-    cd base
-    ```
-2.  **Apply the manifests:**
-    ```bash
-    kubectl apply -f deployment.yml
-    kubectl apply -f service.yml
-    kubectl apply -f ingress.yml
-    ```
-3.  **Verify the deployment:**
-    ```bash
-    kubectl get deployment,service -n popquiz
-    ```
+**What you'll deploy:**
 
-### Autoscaling Deployment
+```
+deployment.yml  →  Redis (StatefulSet) + Qdrant (StatefulSet) + Langchain + Backend + Frontend
+service.yml     →  Internal networking for all 5 services
+ingress.yml     →  External access (routes /api → backend, / → frontend)
+```
 
-This setup automatically scales the number of pods based on CPU load.
+**Steps:**
 
-1.  **Deploy the Base Application First:**
+1.  **Apply all manifests:**
     ```bash
     kubectl apply -f base/deployment.yml
     kubectl apply -f base/service.yml
     kubectl apply -f base/ingress.yml
     ```
+
+2.  **Verify everything is running:**
+    ```bash
+    kubectl get pods -n popquiz
+    ```
+
+    You should see 5 pods (one per service), all with `STATUS: Running`:
+
+    ```
+    NAME                                          READY   STATUS    AGE
+    popquiz-langchain-xxxxx                       1/1     Running   30s
+    popquiz-backend-xxxxx                         1/1     Running   30s
+    popquiz-frontend-xxxxx                        1/1     Running   30s
+    popquiz-qdrant-0                              1/1     Running   30s
+    popquiz-redis-0                               1/1     Running   30s
+    ```
+
+    > **💡 Tip:** If a pod shows `Pending` or `CrashLoopBackOff`, check what went wrong:
+    > ```bash
+    > kubectl describe pod <pod-name> -n popquiz
+    > kubectl logs <pod-name> -n popquiz
+    > ```
+
+3.  **Check services and ingress:**
+    ```bash
+    kubectl get svc -n popquiz
+    kubectl get ingress -n popquiz
+    ```
+
+---
+
+### Autoscaling Deployment
+
+Automatically adjusts the number of pods (HPA) and their resource allocation (VPA) based on real-time CPU usage.
+
+> **How it works:** The HPA watches CPU metrics via the Metrics Server. When average CPU exceeds the target (e.g., 50%), it adds pods. When load drops, it removes them.
+
+**Steps:**
+
+1.  **Deploy the base application first** (if not already running):
+    ```bash
+    kubectl apply -f base/deployment.yml
+    kubectl apply -f base/service.yml
+    kubectl apply -f base/ingress.yml
+    ```
+
 2.  **Apply the Horizontal Pod Autoscaler (HPA):**
     ```bash
     kubectl apply -f autoscaling/hpa.yml
     ```
-3.  **Verify the HPA:**
+
+3.  **Apply the Vertical Pod Autoscaler (VPA)** _(optional — requires VPA controller installed)_:
+    ```bash
+    kubectl apply -f autoscaling/vpa.yml
+    ```
+
+4.  **Verify the HPAs:**
     ```bash
     kubectl get hpa -n popquiz
     ```
-    To see it in action, you can generate load on the service and watch the pod count increase with `kubectl get pods -n popquiz -w`. See the "Useful Commands" section for a load generator script.
+
+    Expected output — one HPA per service:
+
+    ```
+    NAME                     REFERENCE                               TARGETS   MINPODS   MAXPODS
+    popquiz-frontend-hpa     Deployment/popquiz-frontend             10%/50%   1         5
+    popquiz-backend-hpa      Deployment/popquiz-backend              15%/50%   1         5
+    popquiz-langchain-hpa    Deployment/popquiz-langchain            8%/60%    1         3
+    popquiz-redis-hpa        StatefulSet/popquiz-redis               5%/70%    1         3
+    popquiz-qdrant-hpa       StatefulSet/popquiz-qdrant              3%/70%    1         3
+    ```
+
+    > **📝 Note:** The `TARGETS` column shows `<current>/<target>`. If it shows `<unknown>/50%`, the Metrics Server may not be installed yet. See the [Monitoring](#-monitoring-with-prometheus-and-grafana) section.
+
+---
+
+### Helm Chart Deployment 🚢
+
+Package and deploy the entire 5-service stack with a single Helm command. Helm makes it easy to version, upgrade, and rollback your entire application.
+
+1.  **Navigate to the Helm directory:**
+    ```bash
+    cd helm
+    ```
+
+2.  **Review the default values** _(optional but recommended)_:
+    ```bash
+    cat popquiz-chart/values.yaml
+    ```
+
+    You can override any value at install time with `--set key=value`.
+
+3.  **Create Secrets first** (Helm does not manage secrets — they must exist before install):
+    ```bash
+    kubectl create secret generic backend-secrets \
+      --from-env-file=../.env.backend --namespace=popquiz
+    kubectl create secret generic langchain-secrets \
+      --from-env-file=../.env.langchain --namespace=popquiz
+    kubectl create configmap frontend-secrets \
+      --from-env-file=../.env.frontend --namespace=popquiz
+    ```
+
+4.  **Install the chart:**
+    ```bash
+    helm install popquiz-release ./popquiz-chart \
+      --namespace popquiz \
+      --create-namespace
+    ```
+
+5.  **Verify the release:**
+    ```bash
+    helm list -n popquiz
+    kubectl get pods -n popquiz
+    ```
+
+6.  **Upgrade after making changes:**
+    ```bash
+    helm upgrade popquiz-release ./popquiz-chart --namespace popquiz
+    ```
+
+7.  **Rollback if something goes wrong:**
+    ```bash
+    helm rollback popquiz-release 1 --namespace popquiz
+    ```
+
+---
 
 ### Blue-Green Deployment 🔵🟢
 
 Deploy a new version alongside the old one and switch traffic instantly with zero downtime.
 
-1.  **Deploy the Blue Environment:**
-    Apply the blue deployment, its service, and the Ingress that points to it.
+**How it works:** You run two identical environments ("blue" and "green"). Only one receives live traffic at a time. You deploy updates to the idle environment, verify it works, then switch the Ingress to point to it.
+
+```
+                    ┌─────────────────┐
+  Traffic ────────▶ │    Ingress      │
+                    └──────┬──────────┘
+                           │
+              ┌────────────┼────────────┐
+              ▼ (active)                ▼ (idle)
+        ┌──────────┐             ┌──────────┐
+        │   Blue   │             │  Green   │
+        │ (v12)    │             │ (v13)    │
+        └──────────┘             └──────────┘
+```
+
+**Steps:**
+
+1.  **Deploy the Blue environment** (this becomes the live version):
     ```bash
     kubectl apply -f blue-green/deployment-blue.yml
     kubectl apply -f blue-green/service.yml
-    kubectl apply -f blue-green/ingress.yml
+    kubectl apply -f blue-green/ingress.yml   # Make sure you replaced YOUR_CLUSTER_IP first
     ```
-2.  **Verify Blue is Live 🔵:**
-    Check that the Ingress is routing traffic to the blue services.
 
+2.  **Verify Blue is live** 🔵:
     ```bash
-    # Check the frontend route
-    kubectl get ingress popquiz-ingress -n popquiz -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.name}'
-    # Check the backend route
-    kubectl get ingress popquiz-ingress -n popquiz -o jsonpath='{.spec.rules[0].http.paths[1].backend.service.name}'
+    kubectl get ingress popquiz-ingress -n popquiz \
+      -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.name}'
     ```
+    _Expected:_ `popquiz-backend-blue`
 
-    _Expected Output:_ `popquiz-frontend-service-blue` and `popquiz-backend-service-blue`.
-
-3.  **Deploy the Green Environment:**
-    Deploy the new version. This step does not affect live traffic.
+3.  **Deploy the Green environment** (idle — no traffic hits it yet):
     ```bash
     kubectl apply -f blue-green/deployment-green.yml
     ```
-4.  **The Switch! Redirect Traffic to Green 🟢:**
-    Patch the Ingress to atomically switch traffic to the green services.
+
+4.  **Verify Green pods are healthy before switching:**
+    ```bash
+    kubectl get pods -n popquiz -l version=green
+    # All should show Running and Ready
+    ```
+
+5.  **Switch traffic to Green** 🟢:
     ```bash
     kubectl patch ingress popquiz-ingress -n popquiz --type='json' -p='[
-      {"op": "replace", "path": "/spec/rules[0]/http/paths/0/backend/service/name", "value":"popquiz-frontend-service-green"},
-      {"op": "replace", "path": "/spec/rules[0]/http/paths/1/backend/service/name", "value":"popquiz-backend-service-green"}
+      {"op": "replace", "path": "/spec/rules/0/http/paths/0/backend/service/name", "value": "popquiz-backend-green"},
+      {"op": "replace", "path": "/spec/rules/0/http/paths/1/backend/service/name", "value": "popquiz-backend-green"},
+      {"op": "replace", "path": "/spec/rules/0/http/paths/2/backend/service/name", "value": "popquiz-frontend-green"}
     ]'
     ```
-5.  **Verify Green is Live ✅:**
-    Run the same verification commands from step 2. The output should now point to the green services.
-    _Expected Output:_ `popquiz-frontend-service-green` and `popquiz-backend-service-green`.
+
+6.  **Verify Green is live** ✅:
+    ```bash
+    kubectl get ingress popquiz-ingress -n popquiz \
+      -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.name}'
+    ```
+    _Expected:_ `popquiz-backend-green`
+
+7.  **Rollback** (if something is wrong, switch back to Blue):
+    ```bash
+    kubectl patch ingress popquiz-ingress -n popquiz --type='json' -p='[
+      {"op": "replace", "path": "/spec/rules/0/http/paths/0/backend/service/name", "value": "popquiz-backend-blue"},
+      {"op": "replace", "path": "/spec/rules/0/http/paths/1/backend/service/name", "value": "popquiz-backend-blue"},
+      {"op": "replace", "path": "/spec/rules/0/http/paths/2/backend/service/name", "value": "popquiz-frontend-blue"}
+    ]'
+    ```
+
+---
 
 ### Canary Deployment 🐦
 
 Gradually shift a percentage of traffic to a new version to test it in production before a full rollout.
 
-1.  **Deploy the Primary (Stable) Version:**
+**How it works:** The NGINX Ingress Controller supports a `canary-weight` annotation. Two Ingress resources coexist — the stable one gets most traffic, the canary one gets a configurable percentage.
+
+```
+  100 requests ──▶  Ingress
+                      ├── 90 requests → Stable (v12)
+                      └── 10 requests → Canary (v13)
+```
+
+**Steps:**
+
+1.  **Deploy the stable version:**
     ```bash
     kubectl apply -f canary/deployment-stable.yml
     kubectl apply -f canary/service.yml
+    kubectl apply -f canary/ingress-stable.yml   # Make sure you replaced YOUR_CLUSTER_IP first
     ```
-2.  **Expose the Primary Version:**
-    Apply the main Ingress that sends 100% of traffic to the primary version.
-    ```bash
-    kubectl apply -f canary/ingress-stable.yml
-    ```
-3.  **Deploy the Canary Version:**
-    Deploy the new version of your application. It won't receive any traffic yet.
+
+2.  **Deploy the canary version** (doesn't receive traffic yet):
     ```bash
     kubectl apply -f canary/deployment-canary.yml
     ```
-4.  **Begin the Canary Rollout (10% Traffic):**
-    Apply the traffic split configuration. This example assumes you are using a service mesh or an Ingress controller that supports weighted routing (e.g., NGINX with a canary ingress).
+
+3.  **Begin the canary rollout** (starts at 10% traffic):
     ```bash
-    # Deploy the canary ingress that sends 10% of traffic to the new version
+    kubectl apply -f canary/ingress-canary.yml   # Make sure you replaced YOUR_CLUSTER_IP first
+    ```
+
+4.  **Monitor for errors** in the canary pods:
+    ```bash
+    kubectl logs -f deployment/popquiz-backend-canary -n popquiz
+    kubectl logs -f deployment/popquiz-langchain-canary -n popquiz
+    ```
+
+5.  **Increase traffic gradually** — edit `canary/ingress-canary.yml` and change the weight:
+    ```yaml
+    nginx.ingress.kubernetes.io/canary-weight: '25'  # 25%, then 50%, then 100%
+    ```
+    ```bash
     kubectl apply -f canary/ingress-canary.yml
     ```
-5.  **Monitor the Canary** and gradually increase the traffic percentage by editing `canary/ingress-canary.yml` (e.g., adjust `nginx.ingress.kubernetes.io/canary-weight`) until it reaches 100%.
+
+6.  **Full promotion** — once confident, set weight to `100` or replace the stable deployment with the canary version and remove the canary Ingress.
 
 ---
 
 ## 📊 Monitoring with Prometheus and Grafana
 
-Set up a robust monitoring stack to visualize metrics from your cluster and applications. We'll use the `kube-prometheus-stack` Helm chart, which provides a comprehensive, pre-configured setup.
+Set up a monitoring stack to visualize metrics from your cluster and all 5 services. We'll use the `kube-prometheus-stack` Helm chart.
 
-1.  **Add the Prometheus Community Helm repository:**
-    This command adds the repository that contains the chart we need.
+### Step 1 — Install Prometheus + Grafana
 
-    ```bash
-    helm repo add prometheus-community [https://prometheus-community.github.io/helm-charts](https://prometheus-community.github.io/helm-charts)
-    helm repo update
-    ```
+```bash
+# Add the Helm repository
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
 
-2.  **Create a Monitoring Namespace:**
-    It's best practice to install monitoring tools in their own dedicated namespace.
+# Create a dedicated namespace
+kubectl create namespace monitoring
 
-    ```bash
-    kubectl create namespace monitoring
-    ```
+# Install the full stack (Prometheus, Grafana, Alertmanager, exporters)
+helm install prometheus prometheus-community/kube-prometheus-stack \
+  --namespace monitoring
+```
 
-3.  **Install the kube-prometheus-stack:**
-    This Helm command deploys Prometheus, Grafana, Alertmanager, and various exporters to collect metrics from your cluster's nodes and services.
+### Step 2 — Verify Installation
 
-    ```bash
-    helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring
-    ```
+```bash
+kubectl get pods -n monitoring
+```
 
-4.  **Verify the Installation:**
-    Check that all the pods for the monitoring stack are running correctly. You should see pods for Prometheus, Grafana, node-exporter, and others.
+Wait until all pods show `Running`. You should see pods for `prometheus`, `grafana`, `node-exporter`, `kube-state-metrics`, and `alertmanager`.
 
-    ```bash
-    kubectl get pods -n monitoring
-    ```
+### Step 3 — Access Grafana Dashboard
 
-5.  **Access the Grafana Dashboard:**
-    Use `port-forward` to access the Grafana UI from your local machine.
-    ```bash
-    kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
-    ```
-    - Open your browser and go to `http://localhost:3000`.
-    - The default username is `admin`.
-    - To get the default password, run this command:
-      ```bash
-      kubectl get secret --namespace monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
-      ```
-    - Once logged in, you can explore the pre-built dashboards for Kubernetes monitoring!
+```bash
+# Forward Grafana to your local machine
+kubectl port-forward svc/prometheus-grafana -n monitoring 3001:80
+```
+
+> **⚠️ Note:** We use port `3001` because your frontend already uses `3000`.
+
+- Open `http://localhost:3001` in your browser
+- Username: `admin`
+- Password — retrieve it with:
+  ```bash
+  kubectl get secret --namespace monitoring prometheus-grafana \
+    -o jsonpath="{.data.admin-password}" | base64 --decode
+  ```
+
+Once logged in, explore the pre-built dashboards under **Dashboards → Browse** — look for "Kubernetes / Compute Resources" dashboards to see CPU/memory usage per pod and namespace.
 
 ---
 
 ## 🛠️ Useful `kubectl` Commands
 
-Here are some helpful commands for debugging and managing your deployments.
+### Viewing All Resources
 
-### General Management & Debugging
+```bash
+# See everything in the popquiz namespace at a glance
+kubectl get all -n popquiz
+```
 
-| Command                                                   | Description                                               |
-| --------------------------------------------------------- | --------------------------------------------------------- |
-| `kubectl get pods -n popquiz -w`                          | Watch pods being created or terminated in real-time.      |
-| `kubectl describe pod <pod-name> -n popquiz`              | Get detailed information and events for a specific pod.   |
-| `kubectl logs <pod-name> -n popquiz`                      | View the logs from a specific pod.                        |
-| `kubectl logs -f <pod-name> -n popquiz`                   | Stream the logs from a pod in real-time.                  |
-| `kubectl rollout status deployment <name> -n popquiz`     | Check the status of a deployment rollout.                 |
-| `kubectl rollout restart deployment <name> -n popquiz`    | Trigger a rolling restart of all pods in a deployment.    |
-| `kubectl scale deployment <name> --replicas=3 -n popquiz` | Manually scale a deployment to a specific number of pods. |
+### Pod Management & Debugging
+
+| Command | Description |
+|---------|-------------|
+| `kubectl get pods -n popquiz` | List all pods and their status |
+| `kubectl get pods -n popquiz -w` | Watch pods in real-time (Ctrl+C to stop) |
+| `kubectl describe pod <pod-name> -n popquiz` | Detailed info + events for a pod |
+| `kubectl logs <pod-name> -n popquiz` | View logs from a pod |
+| `kubectl logs -f <pod-name> -n popquiz` | Stream logs in real-time |
+| `kubectl exec -it <pod-name> -n popquiz -- sh` | Open a shell inside a pod |
+
+### Deployment Operations
+
+| Command | Description |
+|---------|-------------|
+| `kubectl rollout status deployment <name> -n popquiz` | Check if a rollout completed |
+| `kubectl rollout restart deployment <name> -n popquiz` | Restart all pods in a deployment |
+| `kubectl rollout undo deployment <name> -n popquiz` | Rollback to previous version |
+| `kubectl scale deployment <name> --replicas=3 -n popquiz` | Manually scale a deployment |
 
 ### Testing the Application from Inside the Cluster
 
@@ -290,24 +543,21 @@ To test the API communication between the frontend and backend pods directly.
     ```bash
     kubectl get pods -n popquiz
     ```
-2.  **Exec into the frontend pod:** (Replace `<pod-hash>` with the unique ID from the previous command)
+
+2.  **Exec into the frontend pod** (replace `<pod-hash>` with the unique ID from the previous command):
     ```bash
-    kubectl exec -it -n popquiz popquiz-frontend-deployment-<pod-hash> -- sh
+    kubectl exec -it -n popquiz popquiz-frontend-<pod-hash> -- sh
     ```
-3.  **Inside the pod's shell, install `curl` and test the backend:**
 
-    ```bash
-    # Install curl utility
-    apk add curl
-
+3.  **Inside the pod's shell, test the backend** (uses `wget` — already built into Alpine, no install needed):
+    ```sh
     # Generate a new quiz
-    curl -X POST \
-      -H "Content-Type: application/json" \
-      -d '{"topic": "Hyper Cars", "difficulty": "medium", "count": 1}' \
-      http://popquiz-backend-service/api/quiz/generate
+    wget -qO- --post-data='{"topic": "Hyper Cars", "difficulty": "medium", "count": 1}' \
+      --header='Content-Type: application/json' \
+      http://popquiz-backend/api/quiz/generate
 
     # Fetch a quiz by its room name
-    curl http://popquiz-backend-service/api/quiz/your-room-name-here
+    wget -qO- http://popquiz-backend/api/quiz/<quizId>
     ```
 
 ### Generating Load for HPA Testing
@@ -315,38 +565,38 @@ To test the API communication between the frontend and backend pods directly.
 To test the Horizontal Pod Autoscaler, you need to generate CPU load.
 
 1.  **Open two terminals.**
-
-    - In the first terminal, watch the HPA status: `kubectl get hpa -n popquiz -w`
-    - In the second terminal, watch the pods: `kubectl get pods -n popquiz -w`
+    - In the first terminal, watch the HPA status:
+      ```bash
+      kubectl get hpa -n popquiz -w
+      ```
+    - In the second terminal, watch the pods:
+      ```bash
+      kubectl get pods -n popquiz -w
+      ```
 
 2.  **Find a backend pod name:**
-
     ```bash
     kubectl get pods -n popquiz
     ```
 
 3.  **Exec into a backend pod and start the load generator script:**
-
     ```bash
     # Replace <your-backend-pod-name> with a full pod name from the command above
     kubectl exec -it -n popquiz <your-backend-pod-name> -- sh
     ```
 
 4.  **Inside the pod's shell, run this infinite loop:**
-    ```bash
-    apk add curl
+    ```sh
     # This loop continuously sends requests to the frontend service, generating load.
-    while true; do curl -s http://popquiz-frontend-service > /dev/null; done
+    # Uses wget (built into Alpine — no install needed)
+    while true; do wget -qO- http://popquiz-frontend > /dev/null 2>&1; done
     ```
-5.  **Observe the terminals from Step 1.** You will see the CPU utilization climb in the HPA status, and after it crosses the target threshold, Kubernetes will start creating new pods.
 
----
+Observe the terminals from Step 1. You will see the CPU utilization climb in the HPA status, and after it crosses the target threshold, Kubernetes will start creating new pods.
 
 ## 🤝 Contributing
 
 Contributions are welcome! If you have suggestions for improvements, new strategies, or find any issues, please feel free to open an issue or submit a pull request.
-
----
 
 ## 📄 License
 

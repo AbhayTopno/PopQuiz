@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.backend.name }}-deployment
+  name: {{ .Values.backend.name }}
   namespace: {{ .Values.namespace }}
   labels:
     app: {{ .Values.backend.name }}
@@ -33,6 +33,8 @@ spec:
               value: {{ .Values.backend.env.nodeEnv | quote }}
             - name: NEXT_API
               value: {{ .Values.backend.env.nextApi | quote }}
+            - name: LANGCHAIN_SERVICE_URL
+              value: {{ .Values.backend.env.langchainServiceUrl | quote }}
           resources:
             requests:
               cpu: {{ .Values.backend.resources.requests.cpu }}

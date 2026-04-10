@@ -21,20 +21,20 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: popquiz-backend-service-stable
+                name: popquiz-backend-stable
                 port:
                   number: 80
           - path: /socket.io
             pathType: Prefix
             backend:
               service:
-                name: popquiz-backend-service-stable
+                name: popquiz-backend-stable
                 port:
                   number: 80
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: popquiz-frontend-service-stable
+                name: popquiz-frontend-stable
                 port:
                   number: 80
