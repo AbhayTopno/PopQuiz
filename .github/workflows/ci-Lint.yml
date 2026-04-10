@@ -156,7 +156,7 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: .
-          base: 22c3190
+          base: 55f53f2
           extra_args: --regex --entropy --json
 
   trivy-image-scan:

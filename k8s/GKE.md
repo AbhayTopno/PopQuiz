@@ -237,7 +237,7 @@ cp .env.example.langchain .env.langchain
 **`.env.backend`** — fill in your real values:
 
 ```bash
-MONGO_URI=mongodb+srv://user:password@cluster.mongodb.net/popquiz
+MONGO_URI=mongodb://url/popquiz
 PORT=5000
 CORS_ORIGIN=https://YOUR_IP.nip.io
 JWT_SECRET=your-random-secret-key-min-32-characters
