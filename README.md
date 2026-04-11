@@ -107,7 +107,7 @@ cp .env.example.langchain .env.langchain
 
 Edit `.env.backend`:
 ```env
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/popquiz   # your MongoDB URI
+MONGO_URI=mongodb://localhost:27017/popquiz
 JWT_SECRET=your-random-secret-key-at-least-32-characters
 ```
 
