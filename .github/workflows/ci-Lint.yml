@@ -49,7 +49,7 @@ jobs:
       - run: pnpm prettier --check "${{ matrix.prettier_glob }}"
 
   lint-python:
-    name: "🐍 Lint: langchain (Python)"
+    name: "🧹 Lint: langchain (Python)"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,13 +65,20 @@ jobs:
       - name: Lint with Ruff
         run: uvx ruff check .
 
+  lint-gate:
+    name: "✅ Lint Passed"
+    runs-on: ubuntu-latest
+    needs: [lint, lint-python]
+    steps:
+      - run: echo "All linting passed"
+
   # -----------------------------
-  # Validation Stage
+  # Validation & Security Stage (all parallel)
   # -----------------------------
   docker-validate:
     name: "🐳 Validate: Docker & Compose"
     runs-on: ubuntu-latest
-    needs: [lint, lint-python]
+    needs: [lint-gate]
     steps:
       - uses: actions/checkout@v4
       - name: Create dummy .env files from examples
@@ -141,13 +148,10 @@ jobs:
       - name: Lint Helm chart
         run: helm lint ./k8s/helm/popquiz-chart
 
-  # -----------------------------
-  # Security Scanning Stage
-  # -----------------------------
   secret-scan:
     name: "🔐 Scan: Hardcoded Secrets"
     runs-on: ubuntu-latest
-    needs: [lint, lint-python]
+    needs: [lint-gate]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -162,7 +166,7 @@ jobs:
   trivy-image-scan:
     name: "🛡️ Scan: Trivy (${{ matrix.name }})"
     runs-on: ubuntu-latest
-    needs: [secret-scan]
+    needs: [lint-gate]
     strategy:
       matrix:
         include:
@@ -193,13 +197,10 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
 
-  # -----------------------------
-  # Terraform Validation Stage
-  # -----------------------------
   terraform-validate:
     name: "🏗️ Validate: Terraform"
     runs-on: ubuntu-latest
-    needs: [k8s-validate]
+    needs: [lint-gate]
     defaults:
       run:
         working-directory: terraform
@@ -241,7 +242,7 @@ jobs:
   codeql:
     name: "🔬 Scan: CodeQL"
     runs-on: ubuntu-latest
-    needs: [trivy-image-scan, terraform-validate]
+    needs: [docker-validate, k8s-validate, terraform-validate, secret-scan, trivy-image-scan]
     permissions:
       actions: read
       contents: read
