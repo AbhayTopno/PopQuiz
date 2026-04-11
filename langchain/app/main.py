@@ -4,6 +4,7 @@ Responsible ONLY for wiring: settings → providers → service → app state �
 All business logic lives in chains/ and services/.
 """
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -17,6 +18,16 @@ from app.routers.quiz import router as quiz_router
 from app.services.quiz_service import QuizService
 
 
+def _configure_langsmith() -> None:
+    """Push LangSmith env vars so LangChain auto-traces every chain call."""
+    settings = get_settings()
+    if settings.langchain_api_key and settings.langchain_tracing_v2.lower() == "true":
+        os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+        os.environ.setdefault("LANGCHAIN_API_KEY", settings.langchain_api_key)
+        os.environ.setdefault("LANGCHAIN_PROJECT", settings.langchain_project)
+        os.environ.setdefault("LANGCHAIN_ENDPOINT", settings.langchain_endpoint)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
@@ -24,6 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Routers read app.state.quiz_service via request.app.state — no globals needed.
     """
     settings = get_settings()
+    _configure_langsmith()
 
     llm_provider = GeminiProvider(settings)
     embedder = GeminiEmbedder(settings)
