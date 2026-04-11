@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     # ── Qdrant ────────────────────────────────────────────────────────────────
     qdrant_url: str
 
+    # ── LangSmith (optional — tracing disabled when api_key is empty) ────────
+    langchain_tracing_v2: str = "false"
+    langchain_api_key: str = ""
+    langchain_project: str = "popquiz-langchain"
+    langchain_endpoint: str = "https://api.smith.langchain.com"
+
     # ── FastAPI / CORS ────────────────────────────────────────────────────────
     # Stored as a plain string to avoid pydantic-settings trying to JSON-decode
     # a comma-separated value (which raises JSONDecodeError).
