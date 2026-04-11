@@ -65,20 +65,13 @@ jobs:
       - name: Lint with Ruff
         run: uvx ruff check .
 
-  lint-gate:
-    name: "✅ Lint Passed"
-    runs-on: ubuntu-latest
-    needs: [lint, lint-python]
-    steps:
-      - run: echo "All linting passed"
-
   # -----------------------------
   # Validation & Security Stage (all parallel)
   # -----------------------------
   docker-validate:
     name: "🐳 Validate: Docker & Compose"
     runs-on: ubuntu-latest
-    needs: [lint-gate]
+    needs: [lint, lint-python]
     steps:
       - uses: actions/checkout@v4
       - name: Create dummy .env files from examples
@@ -151,7 +144,7 @@ jobs:
   secret-scan:
     name: "🔐 Scan: Hardcoded Secrets"
     runs-on: ubuntu-latest
-    needs: [lint-gate]
+    needs: [lint, lint-python]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -166,7 +159,7 @@ jobs:
   trivy-image-scan:
     name: "🛡️ Scan: Trivy (${{ matrix.name }})"
     runs-on: ubuntu-latest
-    needs: [lint-gate]
+    needs: [lint, lint-python]
     strategy:
       matrix:
         include:
@@ -200,7 +193,7 @@ jobs:
   terraform-validate:
     name: "🏗️ Validate: Terraform"
     runs-on: ubuntu-latest
-    needs: [lint-gate]
+    needs: [lint, lint-python]
     defaults:
       run:
         working-directory: terraform
