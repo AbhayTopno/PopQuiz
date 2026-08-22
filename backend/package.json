@@ -28,16 +28,20 @@
     "groq-sdk": "^0.33.0",
     "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.19.3",
-    "multer": "^2.1.1",
+    "mongoose": "^8.22.1",
+    "multer": "^2.2.0",
     "socket.io": "^4.8.1"
   },
   "pnpm": {
     "overrides": {
       "jws": "3.2.3",
-      "socket.io-parser": "^4.2.6",
+      "socket.io-parser": ">=4.2.7",
       "path-to-regexp": ">=8.4.0",
-      "picomatch": ">=2.3.2"
+      "picomatch": ">=2.3.2",
+      "engine.io": ">=6.6.7",
+      "form-data": ">=4.0.6",
+      "ip-address": ">=10.3.1",
+      "ws": ">=8.21.0"
     }
   },
   "devDependencies": {

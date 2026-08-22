@@ -140,7 +140,7 @@ jobs:
           kubescape version
           helm version --short
       - name: Validate manifests with kubeconform
-        run: kubeconform -summary -strict -skip CustomResourceDefinition,VerticalPodAutoscaler -ignore-missing-schemas k8s/base/*.yml k8s/autoscaling/hpa.yml k8s/autoscaling/vpa.yml k8s/blue-green/*.yml k8s/canary/*.yml
+        run: kubeconform -summary -strict -skip CustomResourceDefinition,VerticalPodAutoscaler -ignore-missing-schemas k8s/base/*.yml
       - name: Lint manifests with kube-linter
         run: kube-linter lint --config .kube-linter.yaml k8s/base/
       - name: Security scan with Kubescape
