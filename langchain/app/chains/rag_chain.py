@@ -6,11 +6,11 @@ import re
 import tempfile
 from pathlib import Path
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
+from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.vectorstores import VectorStore
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.interfaces.llm_provider import ILLMProvider
 from app.interfaces.vectorstore import IVectorStoreProvider
@@ -205,13 +205,13 @@ class RAGChain:
         try:
             vectorstore = self._build_vectorstore(chunks)
             relevant = self._retrieve(vectorstore, query)
-        except Exception:
+        except Exception:  # noqa: BLE001
             relevant = self._retrieve_lexical(chunks, query)
         finally:
             if vectorstore is not None:
                 try:
                     self._vs_provider.cleanup(vectorstore)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     pass  # best-effort cleanup
 
         context = "\n\n".join(doc.page_content for doc in relevant if doc.page_content)

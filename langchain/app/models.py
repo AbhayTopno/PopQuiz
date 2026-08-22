@@ -7,7 +7,6 @@ contract so quiz.service.ts requires zero changes.
 
 from pydantic import BaseModel, Field
 
-
 # ── Request schemas ──────────────────────────────────────────────────────────
 
 
