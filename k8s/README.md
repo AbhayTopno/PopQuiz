@@ -11,19 +11,39 @@ Welcome! This repository serves as a practical guide and a collection of manifes
 
 PopQuiz is a 5-service application. Understanding what each service does will help you follow the rest of this guide.
 
-```
-┌──────────────┐     ┌──────────────────┐     ┌───────────┐
-│   Frontend   │────▶│     Backend      │───▶│   Redis   │
-│  (Next.js)   │     │   (Express.js)   │     │  (Cache)  │
-│  Port: 3000  │     │   Port: 5000     │     │ Port: 6379│
-└──────────────┘     └───────┬──────────┘     └───────────┘
-                             │
-                             ▼
-                     ┌──────────────────┐     ┌───────────┐
-                     │    Langchain     │────▶│  Qdrant   │
-                     │    (FastAPI)     │     │ (VectorDB)│
-                     │   Port: 8000     │     │ Port: 6333│
-                     └──────────────────┘     └───────────┘
+```text
+ ┌─────────────────────────────────────────────────────────────┐
+ │                 TIER 2: APPLICATION LAYER                   │
+ │        (Deployed via Base, Blue-Green, or Canary)           │
+ │                                                             │
+ │   ┌──────────────┐       ┌──────────────┐                   │
+ │   │   Frontend   │──────▶│   Backend    │                   │
+ │   │  (Next.js)   │       │ (Express.js) │                   │
+ │   │  Port: 3000  │       │  Port: 5000  │                   │
+ │   └──────────────┘       └──────┬───────┘                   │
+ │                                 │                           │
+ │                                 ▼                           │
+ │                          ┌──────────────┐                   │
+ │                          │  Langchain   │                   │
+ │                          │  (FastAPI)   │                   │
+ │                          │  Port: 8000  │                   │
+ │                          └──────────────┘                   │
+ └─────────────────────────────────┬───────────────────────────┘
+                                   │
+                                   ▼
+ ┌─────────────────────────────────────────────────────────────┐
+ │                TIER 1: INFRASTRUCTURE LAYER                 │
+ │                    (Deployed via Helm)                      │
+ │                                                             │
+ │   ┌──────────────┐                              ┌───────────┐
+ │   │    Redis     │                              │  Qdrant   │
+ │   │   (Cache)    │                              │(Vector DB)│
+ │   │  Port: 6379  │                              │Port: 6333 │
+ │   └──────────────┘                              └───────────┘
+ │           ▲                                           ▲     │
+ │           │                                           │     │
+ │    (Backend connects)                     (Langchain connects)
+ └─────────────────────────────────────────────────────────────┘
 ```
 
 | Service | What It Does | Exposed? |
@@ -41,7 +61,8 @@ PopQuiz is a 5-service application. Understanding what each service does will he
 This project provides hands-on examples for the following deployment strategies:
 
 - **Base Deployment**: A standard, straightforward deployment of all 5 services.
-- **Autoscaling**: Automatically scale your application based on resource utilization (HPA + VPA).
+- **Autoscaling**: Automatically scale your stateless apps using HPA and your databases using Helm values.
+- **Zero-Downtime Updates**: Restart your pods without downtime using simple rolling updates.
 - **Blue-Green Deployment**: Achieve zero-downtime releases by switching traffic between two identical environments.
 - **Canary Deployment**: Gradually roll out new versions to a small subset of users to minimize risk.
 - **Helm Chart**: Package and deploy the entire stack with a single command using Helm.
@@ -56,7 +77,7 @@ Before you begin, ensure you have the following tools installed and configured:
 - **kubectl**: The Kubernetes command-line tool. ([Install Guide](https://kubernetes.io/docs/tasks/tools/))
 - **A Kubernetes Cluster**: A running cluster. See the setup guides for your environment:
   - **Local:** [Kind](KIND.md) (lightweight, Docker-based) · [Minikube](MINIKUBE.md) (feature-rich, built-in addons)
-  - **Cloud:** [GKE](GKE.md) (Google Kubernetes Engine) · EKS · AKS
+  - **Cloud:** [GKE](GKE.md) (Google Kubernetes Engine) · [EKS](EKS.md) (Amazon EKS) · AKS
 - **An Ingress Controller**: Required for routing external traffic. We recommend the [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/deploy/).
 - **Git**: For cloning the repository.
 - **Helm** _(optional)_: The package manager for Kubernetes — only needed for the Helm deployment and monitoring stack.
@@ -179,11 +200,24 @@ Also update your `.env.backend` and `.env.frontend` files with the same IP for `
 > }
 > ```
 
+### Step 7 — Deploy the Database Infrastructure (Tier 1 - Required!)
+
+Before deploying your applications, you must deploy the foundational databases (Redis and Qdrant). We use Helm for this because setting up highly available clustered databases requires it.
+
+```bash
+# 1. Download the database charts
+helm dependency update k8s/helm/infrastructure
+
+# 2. Deploy the databases
+helm upgrade --install infra k8s/helm/infrastructure -n popquiz
+```
+Wait a moment for the database pods to start up. These databases will remain running in the background while you experiment with the application deployment strategies below.
+
 ---
 
 ## Deployment Strategies
 
-Choose **one** strategy below and follow its instructions. Each strategy deploys the same 5 services — they just differ in how updates are rolled out.
+Choose **one** strategy below and follow its instructions to deploy your applications. Each strategy deploys the same 3 stateless services (Frontend, Backend, Langchain) and connects to the databases you deployed in Step 7.
 
 > **🔰 Recommended for beginners:** Start with [Base Deployment](#base-deployment), then try [Autoscaling](#autoscaling-deployment).
 
@@ -196,8 +230,8 @@ The simplest strategy — one replica of each service with a straightforward rol
 **What you'll deploy:**
 
 ```
-deployment.yml  →  Redis (StatefulSet) + Qdrant (StatefulSet) + Langchain + Backend + Frontend
-service.yml     →  Internal networking for all 5 services
+deployment.yml  →  Langchain + Backend + Frontend
+service.yml     →  Internal networking for the 3 app services
 ingress.yml     →  External access (routes /api → backend, / → frontend)
 ```
 
@@ -222,8 +256,6 @@ ingress.yml     →  External access (routes /api → backend, / → frontend)
     popquiz-langchain-xxxxx                       1/1     Running   30s
     popquiz-backend-xxxxx                         1/1     Running   30s
     popquiz-frontend-xxxxx                        1/1     Running   30s
-    popquiz-qdrant-0                              1/1     Running   30s
-    popquiz-redis-0                               1/1     Running   30s
     ```
 
     > **💡 Tip:** If a pod shows `Pending` or `CrashLoopBackOff`, check what went wrong:
@@ -240,13 +272,13 @@ ingress.yml     →  External access (routes /api → backend, / → frontend)
 
 ---
 
-### Autoscaling Deployment
+### Autoscaling Deployment 📈
 
-Automatically adjusts the number of pods (HPA) and their resource allocation (VPA) based on real-time CPU usage.
+Automatically scales your stateless apps (Frontend, Backend, Langchain) out (more pods) when CPU usage increases, and scales your databases (Redis, Qdrant) via Helm config.
 
-> **How it works:** The HPA watches CPU metrics via the Metrics Server. When average CPU exceeds the target (e.g., 50%), it adds pods. When load drops, it removes them.
+> **How it works:** For stateless apps, the Horizontal Pod Autoscaler (HPA) watches CPU metrics via the Metrics Server. When average CPU exceeds the target, it adds pods. When load drops, it removes them.
 
-**Steps:**
+**Steps for Stateless Apps (Tier 2):**
 
 1.  **Deploy the base application first** (if not already running):
     ```bash
@@ -255,39 +287,53 @@ Automatically adjusts the number of pods (HPA) and their resource allocation (VP
     kubectl apply -f base/ingress.yml
     ```
 
-2.  **Apply the Horizontal Pod Autoscaler (HPA):**
+2.  **Autoscale the Frontend and Backend using the CLI:**
     ```bash
-    kubectl apply -f autoscaling/hpa.yml
+    kubectl autoscale deployment popquiz-backend --cpu-percent=70 --min=1 --max=5 -n popquiz
+    kubectl autoscale deployment popquiz-frontend --cpu-percent=70 --min=1 --max=5 -n popquiz
     ```
 
-3.  **Apply the Vertical Pod Autoscaler (VPA)** _(optional — requires VPA controller installed)_:
-    ```bash
-    kubectl apply -f autoscaling/vpa.yml
-    ```
-
-4.  **Verify the HPAs:**
+3.  **Verify the HPAs:**
     ```bash
     kubectl get hpa -n popquiz
     ```
 
-    Expected output — one HPA per service:
-
+    Expected output:
     ```
     NAME                     REFERENCE                               TARGETS   MINPODS   MAXPODS
-    popquiz-frontend-hpa     Deployment/popquiz-frontend             10%/50%   1         5
-    popquiz-backend-hpa      Deployment/popquiz-backend              15%/50%   1         5
-    popquiz-langchain-hpa    Deployment/popquiz-langchain            8%/60%    1         3
-    popquiz-redis-hpa        StatefulSet/popquiz-redis               5%/70%    1         3
-    popquiz-qdrant-hpa       StatefulSet/popquiz-qdrant              3%/70%    1         3
+    popquiz-frontend         Deployment/popquiz-frontend             10%/70%   1         5
+    popquiz-backend          Deployment/popquiz-backend              15%/70%   1         5
     ```
 
-    > **📝 Note:** The `TARGETS` column shows `<current>/<target>`. If it shows `<unknown>/50%`, the Metrics Server may not be installed yet. See the [Monitoring](#-monitoring-with-prometheus-and-grafana) section.
+    > **📝 Note:** The `TARGETS` column shows `<current>/<target>`. If it shows `<unknown>/70%`, the Metrics Server may not be installed yet. See the [Monitoring](#-monitoring-with-prometheus-and-grafana) section.
+
+**Steps for Databases (Tier 1):**
+
+For stateful databases like Redis and Qdrant managed by Helm, scaling is done by updating the cluster size, not via CPU metrics.
+1. Update `replicaCount` in `k8s/helm/infrastructure/values.yaml`
+2. Run `helm upgrade --install infra k8s/helm/infrastructure -n popquiz`
+
+---
+
+### Zero-Downtime Updates 🔄
+
+When you update your application code and push a new Docker image with the **same tag** (e.g., `latest`), Kubernetes won't automatically pull it because the deployment YAML hasn't changed.
+
+To force Kubernetes to pull the new image with **zero downtime**, simply restart the deployment. Kubernetes will gracefully start new pods, wait for them to become healthy, and only then terminate the old pods.
+
+```bash
+# Restart Backend
+kubectl rollout restart deployment popquiz-backend -n popquiz
+
+# Restart Frontend
+kubectl rollout restart deployment popquiz-frontend -n popquiz
+```
 
 ---
 
 ### Helm Chart Deployment 🚢
 
-Package and deploy the entire 5-service stack with a single Helm command. Helm makes it easy to version, upgrade, and rollback your entire application.
+Package and deploy the 3 application services with a single Helm command. Helm makes it easy to version, upgrade, and rollback your stateless applications.
 
 1.  **Navigate to the Helm directory:**
     ```bash
@@ -460,49 +506,110 @@ Gradually shift a percentage of traffic to a new version to test it in productio
 
 ## 📊 Monitoring with Prometheus and Grafana
 
-Set up a monitoring stack to visualize metrics from your cluster and all 5 services. We'll use the `kube-prometheus-stack` Helm chart.
+To view CPU, memory, pod counts, restarts, and crash states for PopQuiz in Grafana, use the Kubernetes-native monitoring stack only.
 
 ### Step 1 — Install Prometheus + Grafana
 
 ```bash
-# Add the Helm repository
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update
 
-# Create a dedicated namespace
 kubectl create namespace monitoring
 
-# Install the full stack (Prometheus, Grafana, Alertmanager, exporters)
 helm install prometheus prometheus-community/kube-prometheus-stack \
   --namespace monitoring
 ```
 
-### Step 2 — Verify Installation
+### Step 2 — Install Metrics Server
+
+```bash
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+### Step 3 — Verify the monitoring stack
 
 ```bash
 kubectl get pods -n monitoring
+kubectl get pods -n kube-system | grep metrics-server
 ```
 
-Wait until all pods show `Running`. You should see pods for `prometheus`, `grafana`, `node-exporter`, `kube-state-metrics`, and `alertmanager`.
+Wait until the monitoring pods and Metrics Server show `Running`.
 
-### Step 3 — Access Grafana Dashboard
+### Step 4 — Open Grafana
 
 ```bash
-# Forward Grafana to your local machine
 kubectl port-forward svc/prometheus-grafana -n monitoring 3001:80
 ```
 
-> **⚠️ Note:** We use port `3001` because your frontend already uses `3000`.
+Then open:
 
-- Open `http://localhost:3001` in your browser
+```text
+http://localhost:3001
+```
+
+Login with:
+
 - Username: `admin`
-- Password — retrieve it with:
-  ```bash
-  kubectl get secret --namespace monitoring prometheus-grafana \
-    -o jsonpath="{.data.admin-password}" | base64 --decode
-  ```
+- Password:
 
-Once logged in, explore the pre-built dashboards under **Dashboards → Browse** — look for "Kubernetes / Compute Resources" dashboards to see CPU/memory usage per pod and namespace.
+```bash
+kubectl get secret --namespace monitoring prometheus-grafana \
+  -o jsonpath="{.data.admin-password}" | base64 --decode
+```
+
+### Step 5 — Add panels in Grafana
+
+In Grafana, create panels and use the Prometheus data source with the following queries.
+
+#### CPU usage for all PopQuiz pods
+
+```promql
+sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="popquiz"}[5m]))
+```
+
+#### Memory usage for all PopQuiz pods
+
+```promql
+sum by (pod) (container_memory_working_set_bytes{namespace="popquiz"})
+```
+
+#### CPU usage for Redis and Qdrant only
+
+```promql
+sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="popquiz", pod=~".*(redis|qdrant).*"}[5m]))
+```
+
+#### Memory usage for Redis and Qdrant only
+
+```promql
+sum by (pod) (container_memory_working_set_bytes{namespace="popquiz", pod=~".*(redis|qdrant).*"})
+```
+
+#### Number of running pods
+
+```promql
+sum by (namespace) (kube_pod_status_phase{namespace="popquiz", phase="Running"})
+```
+
+#### Number of crashed pods / crash loops
+
+```promql
+sum by (namespace) (kube_pod_container_status_waiting_reason{namespace="popquiz", reason="CrashLoopBackOff"})
+```
+
+#### Pod restart count
+
+```promql
+sum by (pod) (kube_pod_container_status_restarts_total{namespace="popquiz"})
+```
+
+#### Deployment replica count
+
+```promql
+kube_deployment_status_replicas_available{namespace="popquiz"}
+```
+
+These queries are enough to show the CPU, memory, pod count, restart, and crash-state metrics you asked for in Grafana.
 
 ---
 

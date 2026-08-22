@@ -24,17 +24,6 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ .Values.backend.secretName }}
-          env:
-            - name: REDIS_URL
-              value: {{ .Values.backend.env.redisUrl | quote }}
-            - name: PORT
-              value: {{ .Values.backend.port | quote }}
-            - name: NODE_ENV
-              value: {{ .Values.backend.env.nodeEnv | quote }}
-            - name: NEXT_API
-              value: {{ .Values.backend.env.nextApi | quote }}
-            - name: LANGCHAIN_SERVICE_URL
-              value: {{ .Values.backend.env.langchainServiceUrl | quote }}
           resources:
             requests:
               cpu: {{ .Values.backend.resources.requests.cpu }}
@@ -42,3 +31,6 @@ spec:
             limits:
               cpu: {{ .Values.backend.resources.limits.cpu }}
               memory: {{ .Values.backend.resources.limits.memory }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000

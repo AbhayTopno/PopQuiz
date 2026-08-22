@@ -1,0 +1,12 @@
+apiVersion: v2
+name: infrastructure
+description: A Helm chart for deploying Tier 1 Databases (Redis, Qdrant) for PopQuiz
+version: 0.1.0
+appVersion: '1.0'
+dependencies:
+  - name: redis
+    version: 19.6.1 # Recent Bitnami Redis version
+    repository: https://charts.bitnami.com/bitnami
+  - name: qdrant
+    version: 0.8.2 # Recent Qdrant version
+    repository: https://qdrant.to/helm

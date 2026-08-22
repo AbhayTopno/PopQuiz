@@ -8,13 +8,13 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: '10m'
     nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
     nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
-    # WebSocket support for Socket.IO
+    nginx.ingress.kubernetes.io/use-forwarded-headers: 'true'
+    nginx.ingress.kubernetes.io/compute-full-forwarded-for: 'true'
     nginx.ingress.kubernetes.io/upstream-hash-by: '$http_upgrade'
 spec:
   ingressClassName: nginx
   rules:
-    - host: YOUR_CLUSTER_IP.nip.io
-      http:
+    - http:
         paths:
           - path: /api
             pathType: Prefix

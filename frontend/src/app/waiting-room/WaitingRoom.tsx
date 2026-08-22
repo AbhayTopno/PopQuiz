@@ -36,6 +36,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
     null,
   );
   const [messageInput, setMessageInput] = useState('');
+  const [joinLink, setJoinLink] = useState('');
 
   const {
     socket,
@@ -66,6 +67,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       duration: 0.5,
       ease: 'power2.out',
     });
+    setJoinLink(window.location.href.replace(/([?&])host=1(&|$)/, '$1').replace(/[?&]$/, ''));
   }, []);
 
   const closeSettings = () => setIsSettingsOpen(false);
@@ -80,14 +82,30 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
   };
 
   const copyLink = async () => {
+    const linkToCopy = joinLink || window.location.href;
     try {
-      await navigator.clipboard.writeText(
-        window.location.href.replace(/([?&])host=1(&|$)/, '$1').replace(/[?&]$/, ''),
-      );
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(linkToCopy);
+      } else {
+        // Fallback for non-HTTPS environments (like HTTP Load Balancers)
+        const textArea = document.createElement('textarea');
+        textArea.value = linkToCopy;
+        textArea.style.position = 'absolute';
+        textArea.style.left = '-999999px';
+        document.body.prepend(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+        } catch (error) {
+          console.error('Fallback copy failed', error);
+        } finally {
+          textArea.remove();
+        }
+      }
       setCopied(true);
-      setTimeout(() => setCopied(false), 1000);
+      setTimeout(() => setCopied(false), 2000);
     } catch (e) {
-      if (process.env.NODE_ENV === 'development') console.error('Copy failed', e);
+      console.error('Copy failed', e);
     }
   };
 
@@ -259,7 +277,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
             <h2 className="mb-4 text-lg font-semibold">Settings</h2>
             <div className="space-y-4 flex-1 overflow-y-auto pr-2">
               <SettingsPanel
-                roomId={roomId}
+                roomId={joinLink || roomId}
                 settings={settings}
                 updateSettings={updateSettings}
                 isHost={isHost}
@@ -305,7 +323,7 @@ const WaitingRoom: React.FC<WaitingRoomProps> = ({
       <SettingsDrawer
         isOpen={isSettingsOpen}
         onClose={closeSettings}
-        roomId={roomId}
+        roomId={joinLink || roomId}
         mode={mode}
         settings={settings}
         updateSettings={updateSettings}

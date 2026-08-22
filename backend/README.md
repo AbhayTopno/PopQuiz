@@ -12,13 +12,13 @@ The Express.js + TypeScript API server that powers PopQuiz. Handles authenticati
 │  (Next.js)    │ REST  │  (Express)   │ REST  │  (FastAPI)   │
 │  :3000        │ + WS  │  :5000       │       │  :8000       │
 └───────────────┘       └──────┬───────┘       └──────────────┘
-                               │
-                    ┌──────────┼──────────┐
-                    │          │          │
-               ┌────▼───┐  ┌───▼────┐ ┌───▼────┐
-               │MongoDB │  │ Redis  │ │ Qdrant │
-               │(Atlas) │  │ :6379  │ │ :6333  │
-               └────────┘  └────────┘ └────────┘
+                               │                      │
+                         ┼──────────┼                 │   
+                         │          │                 │
+                    ┌────▼───┐  ┌───▼────┐        ┌───▼────┐
+                    │MongoDB │  │ Redis  │        │ Qdrant │
+                    │(Atlas) │  │ :6379  │        │ :6333  │
+                    └────────┘  └────────┘        └────────┘
 ```
 
 ### How a quiz request flows

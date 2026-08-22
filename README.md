@@ -13,7 +13,7 @@ PopQuiz lets you **generate and host interactive quizzes on any topic using Goog
 - **Multiplayer Rooms** -- 1v1, 2v2, co-op, free-for-all, and custom arena modes with live scoring
 - **RAG Pipeline** -- upload documents and generate quizzes grounded in your content (LangChain + Qdrant)
 - **Real-time** -- Socket.IO for live game events, chat, scores, and team assignments
-- **Cloud-Native** -- Kubernetes manifests (base, blue-green, canary, Helm), Terraform for GCP
+- **Cloud-Native** -- Kubernetes manifests (base, blue-green, canary, Helm), Terraform for GCP & AWS
 - **Dockerized** -- one-command setup with 3 compose profiles (dev, staging, production)
 - **LangSmith Observability** -- optional tracing for the AI pipeline
 
@@ -60,7 +60,7 @@ PopQuiz lets you **generate and host interactive quizzes on any topic using Goog
 | **Backend** | ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white) ![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white) |
 | **AI / ML** | ![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white) ![Google Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white) ![Qdrant](https://img.shields.io/badge/Qdrant-DC382D?style=for-the-badge) |
 | **Database** | ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white) |
-| **Infra** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white) ![Helm](https://img.shields.io/badge/Helm-0F1689?style=for-the-badge&logo=helm&logoColor=white) ![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white) ![GCP](https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white) |
+| **Infra** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white) ![Helm](https://img.shields.io/badge/Helm-0F1689?style=for-the-badge&logo=helm&logoColor=white) ![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white) ![GCP](https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white) ![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white) |
 | **Observability** | ![LangSmith](https://img.shields.io/badge/LangSmith-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white) |
 | **Package Manager** | ![pnpm](https://img.shields.io/badge/pnpm-F69220?style=for-the-badge&logo=pnpm&logoColor=white) ![uv](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white) |
 
@@ -80,7 +80,8 @@ PopQuiz/
 |   +-- canary/        # Canary deployment
 |   +-- helm/          # Helm chart (popquiz-chart)
 |   +-- autoscaling/   # HPA, VPA, cluster autoscaler
-+-- terraform/         # GCP infrastructure (GKE cluster, VPC, IAM)
++-- terraform/         # GCP infra (GKE cluster, VPC, IAM) at root
+|   +-- aws/           # AWS infra (EKS cluster, VPC, IAM) -- mirrors root for AWS
 ```
 
 > Each sub-folder has its own README with detailed setup instructions.
@@ -202,7 +203,9 @@ See the [k8s README](k8s/README.md) and [GKE guide](k8s/GKE.md) for full details
 
 ## Terraform Infrastructure
 
-Provisions a GKE cluster on Google Cloud:
+Provisions a Kubernetes cluster on either cloud -- pick one, both deploy the same `k8s/` manifests:
+
+**GCP (GKE):**
 
 ```bash
 cd terraform
@@ -213,6 +216,18 @@ terraform apply
 ```
 
 Provisions: GKE cluster, VPC, firewall rules, service accounts, IAM roles. See the [terraform README](terraform/README.md).
+
+**AWS (EKS):**
+
+```bash
+cd terraform/aws
+cp terraform.tfvars.example terraform.tfvars   # fill in region, cluster name, etc.
+terraform init
+terraform plan
+terraform apply
+```
+
+Provisions: EKS cluster, VPC, EBS CSI driver (for Redis/Qdrant volumes), IAM roles (IRSA), and a node security group rule so the site is reachable as soon as `k8s/base/` is deployed. See the [terraform/aws README](terraform/aws/README.md).
 
 ---
 
