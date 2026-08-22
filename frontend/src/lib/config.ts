@@ -28,22 +28,22 @@ const resolveClientUrl = (candidate: string | undefined, fallback: string) => {
   try {
     const url = new URL(value);
 
+    // If it's a real external URL (e.g., a custom domain API), use it directly
     if (!looksInternalHost(url.hostname)) {
       return url.toString();
     }
 
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    const path = url.pathname === '/' ? '' : url.pathname;
-    const search = url.search ?? '';
-    const hash = url.hash ?? '';
-
-    if (protocol === 'https:') {
-      return `${window.location.origin}${path}${search}${hash}`;
+    // We are trying to reach an internal backend (e.g., 'popquiz-backend' or 'localhost:5000').
+    // If the browser is running on an external domain (like the AWS NLB),
+    // it MUST communicate through the ingress on the default port (80 or 443).
+    const currentHost = window.location.hostname.toLowerCase();
+    if (!LOCAL_HOST_HINTS.includes(currentHost)) {
+      return window.location.origin; // Returns e.g. "http://NLB_HOSTNAME" (no port)
     }
 
-    const portSuffix = url.port ? `:${url.port}` : '';
-    return `${url.protocol}//${hostname}${portSuffix}${path}${search}${hash}`;
+    // We are developing locally (browser is at localhost:3000),
+    // so we keep the port from the target URL (e.g. 5000)
+    return value;
   } catch (error) {
     console.error('Failed to resolve client URL, returning fallback', error);
     return value;

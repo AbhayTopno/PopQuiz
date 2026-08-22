@@ -1,0 +1,23 @@
+qdrant:
+  # Configuration for the official Qdrant Helm chart dependency
+  replicaCount: 3
+  config:
+    cluster:
+      enabled: true
+  persistence:
+    size: 5Gi
+
+redis:
+  # Configuration for the official Bitnami Redis Helm chart dependency
+  image:
+    tag: "latest"
+  architecture: replication
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 1Gi
+  replica:
+    replicaCount: 3
+    persistence:
+      size: 1Gi

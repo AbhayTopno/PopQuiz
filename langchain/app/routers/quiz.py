@@ -73,7 +73,7 @@ async def generate_from_topic(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Quiz generation failed: {e}",
@@ -88,7 +88,7 @@ async def generate_from_topic(
 )
 async def generate_from_document(
     request: Request,
-    file: UploadFile = File(
+    file: UploadFile = File(  # noqa: B008
         ..., description="PDF/DOCX document or PNG/JPEG/WEBP image"
     ),
     difficulty: str = Form(default="medium", pattern="^(easy|medium|hard)$"),
@@ -126,7 +126,7 @@ async def generate_from_document(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"RAG generation failed: {e}",

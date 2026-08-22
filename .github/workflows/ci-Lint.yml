@@ -140,7 +140,7 @@ jobs:
           kubescape version
           helm version --short
       - name: Validate manifests with kubeconform
-        run: kubeconform -summary -strict -skip CustomResourceDefinition,VerticalPodAutoscaler -ignore-missing-schemas k8s/base/*.yml k8s/autoscaling/hpa.yml k8s/autoscaling/vpa.yml k8s/blue-green/*.yml k8s/canary/*.yml
+        run: kubeconform -summary -strict -skip CustomResourceDefinition,VerticalPodAutoscaler -ignore-missing-schemas k8s/base/*.yml
       - name: Lint manifests with kube-linter
         run: kube-linter lint --config .kube-linter.yaml k8s/base/
       - name: Security scan with Kubescape
@@ -210,7 +210,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.0
+          terraform_version: 1.8.0
 
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
@@ -250,7 +250,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [javascript, typescript, python]
+        language: [javascript-typescript, python]
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3

@@ -9,7 +9,6 @@ from langchain_core.messages import HumanMessage
 from app.interfaces.llm_provider import ILLMProvider
 from app.utils.parser import extract_quiz_json
 
-
 _IMAGE_PROMPT = """
 You are a professional quiz master.
 

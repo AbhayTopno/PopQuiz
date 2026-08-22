@@ -5,6 +5,8 @@ import quizRoutes from './routes/quizRoutes.js';
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 const escapeRegexSpecials = (value: string) => value.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&');
 
 const resolveCorsOrigin = () => {
