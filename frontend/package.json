@@ -23,7 +23,10 @@
   },
   "pnpm": {
     "overrides": {
-      "picomatch": ">=4.0.4"
+      "picomatch": ">=4.0.4",
+      "nanoid": ">=3.3.18",
+      "postcss": ">=8.5.18",
+      "sharp": ">=0.35.0"
     }
   },
   "devDependencies": {
